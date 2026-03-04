@@ -1,17 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const chatArea = document.getElementById('chatArea') as HTMLElement;
-    const userInput = document.getElementById('userInput') as HTMLInputElement;
-    const sendBtn = document.getElementById('sendBtn') as HTMLElement;
+    const chatArea = document.getElementById('chatArea');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
 
     let currentStep = 'start';
 
-    // Interface para estender o objeto window
-    interface CustomWindow extends Window {
-        handleAction: (action: string) => void;
-    }
-
     // Função para adicionar mensagem ao chat
-    function addMessage(text: string | null, type: 'system' | 'user', htmlContent: string | null = null) {
+    function addMessage(text, type, htmlContent = null) {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('message');
         msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
@@ -33,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             setTimeout(() => {
                 const buttons = `
-                    <p>Deseja verificar as opções disponíveis?</p>
                     <div class="btn-container">
                         <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
                     </div>
@@ -44,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Manipulador de Ações de Botões
-    (window as unknown as CustomWindow).handleAction = (action: string) => {
+    window.handleAction = (action) => {
         if (action === 'ver_condicoes') {
             addMessage("Ver condições", 'user');
             currentStep = 'cpf';
@@ -52,35 +46,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 addMessage("Por favor, informe seu CPF (apenas os 11 números) para consultarmos seu contrato.", 'system');
             }, 800);
         } else if (action === 'escolher_avista') {
-            addMessage("Escolhi pagamento à vista", 'user');
+            addMessage("Pagamento à vista com desconto", 'user');
             setTimeout(() => {
                 const content = `
-                    <p>Excelente escolha! Aqui está sua oferta:</p>
                     <div class="option-card">
                         <h4>Pagamento à Vista</h4>
                         <p>De: R$ 8.200,00</p>
                         <p>Por: <span class="highlight">R$ 5.000,00</span></p>
-                        <p>Economia de R$ 3.200,00!</p>
                     </div>
                     <div class="btn-container">
-                        <a href="https://wa.me/5511999999999" target="_blank" class="chat-btn">Falar com Especialista</a>
+                        <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar PIX</button>
+                        <a href="https://wa.me/5511999999999" target="_blank" class="chat-btn secondary">Falar com especialista</a>
                     </div>
                 `;
                 addMessage(null, 'system', content);
             }, 800);
         } else if (action === 'escolher_parcelado') {
-            addMessage("Escolhi parcelamento", 'user');
+            addMessage("Parcelamento", 'user');
             setTimeout(() => {
                 const content = `
-                    <p>Temos uma ótima opção de parcelamento:</p>
                     <div class="option-card">
-                        <h4>Parcelamento Facilitado</h4>
-                        <p>Valor total: R$ 5.000,00</p>
-                        <p>Condição: <span class="highlight">5x de R$ 1.000,00</span></p>
+                        <h4>Parcelamento</h4>
+                        <p><span class="highlight">5x de R$ 1.000,00</span></p>
                     </div>
                     <div class="btn-container">
-                        <a href="https://wa.me/5511995271952" target="_blank" class="chat-btn">Falar com Especialista</a>
+                        <a href="https://wa.me/5511999999999" target="_blank" class="chat-btn">Falar com especialista</a>
                     </div>
+                `;
+                addMessage(null, 'system', content);
+            }, 800);
+        } else if (action === 'gerar_pix') {
+            addMessage("Gerar PIX", 'user');
+            setTimeout(() => {
+                const content = `
+                    <p>Aqui está o código PIX Copia e Cola:</p>
+                    <div class="option-card" style="word-break: break-all; font-family: monospace; font-size: 12px; background: #f4f4f4;">
+                        00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266554400005204000053039865406500.005802BR5913Empresa Teste6008SAO PAULO62070503***63041A2B
+                    </div>
+                    <p style="margin-top: 10px; font-size: 12px;">Válido por 24 horas.</p>
                 `;
                 addMessage(null, 'system', content);
             }, 800);
@@ -103,9 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     setTimeout(() => {
                         const options = `
-                            <p>Encontramos as seguintes opções para você:</p>
+                            <p>Opções disponíveis:</p>
                             <div class="btn-container">
-                                <button class="chat-btn" onclick="handleAction('escolher_avista')">À vista com desconto</button>
+                                <button class="chat-btn" onclick="handleAction('escolher_avista')">Pagamento à vista com desconto</button>
                                 <button class="chat-btn secondary" onclick="handleAction('escolher_parcelado')">Parcelamento</button>
                             </div>
                         `;
@@ -122,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     sendBtn.addEventListener('click', handleSend);
-    userInput.addEventListener('keypress', (e: KeyboardEvent) => {
+    userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSend();
     });
 
