@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Especialista - Acordo Certo</title>
+    <link rel="stylesheet" href="painel.css">
+</head>
+<body>
+    <div class="panel-container">
+        <!-- Barra Lateral: Lista de Clientes -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Atendimentos Ao Vivo</h2>
+                <p>Clientes aguardando especialista</p>
+            </div>
+            <div class="client-list" id="clientList">
+                <!-- Clientes aparecerão aqui dinamicamente -->
+                <div class="empty-state">Nenhum cliente conectado no momento.</div>
+            </div>
+        </aside>
+
+        <!-- Área Principal: Chat com o Cliente -->
+        <main class="chat-area">
+            <div class="chat-header" id="chatHeader">
+                <h2>Selecione um cliente na lista ao lado para iniciar o atendimento</h2>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <!-- Mensagens do chat aparecerão aqui -->
+            </div>
+            
+            <div class="chat-input-area" id="chatInputArea" style="display: none;">
+                <input type="text" id="agentInput" placeholder="Digite sua mensagem para o cliente..." autocomplete="off">
+                <button id="agentSendBtn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                    </svg>
+                    Enviar
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="painel.js"></script>
+</body>
+</html>

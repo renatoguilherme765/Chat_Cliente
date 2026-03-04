@@ -1,0 +1,195 @@
+/* Estilos do Painel do Especialista */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #d9dbd5;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.panel-container {
+    display: flex;
+    width: 100%;
+    max-width: 1200px;
+    height: 95vh;
+    background: #fff;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Sidebar (Esquerda) */
+.sidebar {
+    width: 30%;
+    border-right: 1px solid #d1d7db;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+.sidebar-header {
+    background: #f0f2f5;
+    padding: 15px 20px;
+    border-bottom: 1px solid #d1d7db;
+}
+
+.sidebar-header h2 {
+    font-size: 18px;
+    color: #111b21;
+}
+
+.sidebar-header p {
+    font-size: 13px;
+    color: #667781;
+    margin-top: 5px;
+}
+
+.client-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.empty-state {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+}
+
+.client-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f2f2f2;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.client-item:hover {
+    background: #f5f6f6;
+}
+
+.client-item.active {
+    background: #ebebeb;
+}
+
+.client-item strong {
+    color: #111b21;
+    font-size: 15px;
+}
+
+.client-item small {
+    color: #667781;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Área de Chat (Direita) */
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #efeae2;
+    background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+    background-size: contain;
+}
+
+.chat-header {
+    background: #f0f2f5;
+    padding: 15px 20px;
+    border-bottom: 1px solid #d1d7db;
+    display: flex;
+    align-items: center;
+}
+
+.chat-header h2 {
+    font-size: 16px;
+    color: #111b21;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Estilo das mensagens no painel */
+.message {
+    max-width: 70%;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+}
+
+.client-msg {
+    align-self: flex-start;
+    background-color: #fff;
+    color: #111b21;
+    border-top-left-radius: 0;
+}
+
+.agent-msg {
+    align-self: flex-end;
+    background-color: #d9fdd3;
+    color: #111b21;
+    border-top-right-radius: 0;
+}
+
+/* Esconder botões e cards do bot no painel do agente para focar no texto */
+.message .btn-container,
+.message .welcome-card,
+.message .option-card {
+    opacity: 0.7;
+    pointer-events: none;
+    transform: scale(0.95);
+    transform-origin: left top;
+}
+
+/* Input Area */
+.chat-input-area {
+    background: #f0f2f5;
+    padding: 15px 20px;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    border-top: 1px solid #d1d7db;
+}
+
+.chat-input-area input {
+    flex: 1;
+    padding: 12px 15px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+    font-size: 15px;
+    color: #111b21;
+}
+
+.chat-input-area button {
+    background: #008069;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.chat-input-area button:hover {
+    background: #016b58;
+}

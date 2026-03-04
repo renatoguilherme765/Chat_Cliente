@@ -4,9 +4,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('sendBtn');
 
     let currentStep = 'start';
+    const clientId = 'cliente_' + Math.random().toString(36).substr(2, 9);
+    let isLiveChat = false;
+    let userCpf = 'Não informado';
+    let chatHistory = [];
+
+    // Sincroniza o chat com o localStorage para o painel do especialista
+    function syncStorage() {
+        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+        chats[clientId] = {
+            id: clientId,
+            cpf: userCpf,
+            messages: chatHistory,
+            isLive: isLiveChat,
+            lastUpdate: Date.now()
+        };
+        localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
+    }
+
+    // Escuta mensagens vindas do painel do especialista
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'acordo_certo_chats') {
+            let chats = JSON.parse(e.newValue || '{}');
+            let myChat = chats[clientId];
+            
+            // Se o histórico do painel for maior que o local, recebemos mensagem nova
+            if (myChat && myChat.messages.length > chatHistory.length) {
+                let newMsgs = myChat.messages.slice(chatHistory.length);
+                newMsgs.forEach(msg => {
+                    if (msg.type === 'agent') {
+                        // Adiciona a mensagem do agente na tela do cliente sem salvar de volta (loop)
+                        addMessage(msg.text, 'system', msg.htmlContent, false);
+                        chatHistory.push(msg); // Atualiza o histórico local
+                    }
+                });
+            }
+        }
+    });
 
     // Função para adicionar mensagem ao chat
-    function addMessage(text, type, htmlContent = null) {
+    function addMessage(text, type, htmlContent = null, save = true) {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('message');
         msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
@@ -19,6 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatArea.appendChild(msgDiv);
         chatArea.scrollTop = chatArea.scrollHeight;
+
+        if (save) {
+            chatHistory.push({ text, type, htmlContent });
+            syncStorage();
+        }
     }
 
     // Fluxo Inicial
@@ -50,35 +92,62 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 addMessage("Por favor, informe seu CPF (apenas os 11 números) para consultarmos seu contrato.", 'system');
             }, 800);
-        } else if (action === 'escolher_avista') {
-            addMessage("Pagamento à vista com desconto", 'user');
+        } else if (action === 'pagamento_total') {
+            addMessage("1️⃣ Pagamento total da(s) parcela(s)", 'user');
             setTimeout(() => {
-                const content = `
-                    <div class="option-card">
-                        <h4>Pagamento à Vista</h4>
-                        <p>De: R$ 8.200,00</p>
-                        <p>Por: <span class="highlight">R$ 5.000,00</span></p>
-                    </div>
-                    <div class="btn-container">
-                        <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar PIX</button>
-                        <a href="https://wa.me/5511999999999" target="_blank" class="chat-btn secondary">Falar com especialista</a>
-                    </div>
-                `;
-                addMessage(null, 'system', content);
+                addMessage("Aguarde um instante, estamos analisando a melhor condição para pagamento total do seu contrato.", 'system');
+                setTimeout(() => {
+                    const content = `
+                        <div class="option-card">
+                            <h4>Pagamento à Vista</h4>
+                            <p>De: R$ 8.200,00</p>
+                            <p>Por: <span class="highlight">R$ 5.000,00</span></p>
+                        </div>
+                        <div class="btn-container">
+                            <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar PIX</button>
+                            <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">Falar com especialista</button>
+                        </div>
+                    `;
+                    addMessage(null, 'system', content);
+                }, 1500);
             }, 800);
-        } else if (action === 'escolher_parcelado') {
-            addMessage("Parcelamento", 'user');
+        } else if (action === 'renegociacao_carencia') {
+            addMessage("2️⃣ Renegociação com carência de até 90 dias", 'user');
             setTimeout(() => {
-                const content = `
-                    <div class="option-card">
-                        <h4>Parcelamento</h4>
-                        <p><span class="highlight">5x de R$ 1.000,00</span></p>
-                    </div>
-                    <div class="btn-container">
-                        <a href="https://wa.me/5511999999999" target="_blank" class="chat-btn">Falar com especialista</a>
-                    </div>
-                `;
-                addMessage(null, 'system', content);
+                addMessage("Estamos analisando a proposta de renegociação com carência. Aguarde um instante enquanto verificamos as condições disponíveis.", 'system');
+                setTimeout(() => {
+                    const content = `
+                        <div class="option-card">
+                            <h4>Parcelamento</h4>
+                            <p><span class="highlight">5x de R$ 1.000,00</span></p>
+                        </div>
+                        <div class="btn-container">
+                            <button class="chat-btn" onclick="handleAction('falar_especialista')">Falar com especialista</button>
+                        </div>
+                    `;
+                    addMessage(null, 'system', content);
+                }, 1500);
+            }, 800);
+        } else if (action === 'entrega_amigavel') {
+            addMessage("3️⃣ Entrega amigável do bem", 'user');
+            setTimeout(() => {
+                const msg = "A entrega amigável é quitativa, ou seja, realiza a liquidação total do financiamento.<br><br>Caso existam débitos no DETRAN, iremos regularizar e retirar essas pendências.<br><br>Após a conclusão, você poderá verificar a possibilidade de financiar outro veículo com parcelas que caibam no seu bolso.<br><br>Todas as informações estão sujeitas à análise.";
+                addMessage(null, 'system', msg);
+                setTimeout(() => {
+                    const btn = `
+                        <div class="btn-container">
+                            <button class="chat-btn" onclick="handleAction('falar_especialista')">Falar com especialista</button>
+                        </div>
+                    `;
+                    addMessage(null, 'system', btn);
+                }, 1500);
+            }, 800);
+        } else if (action === 'falar_especialista') {
+            addMessage("4️⃣ Falar com um especialista", 'user');
+            setTimeout(() => {
+                addMessage("Aguarde um instante, você será conectado a um especialista.", 'system');
+                isLiveChat = true;
+                syncStorage();
             }, 800);
         } else if (action === 'gerar_pix') {
             addMessage("Gerar PIX", 'user');
@@ -103,9 +172,18 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage(text, 'user');
         userInput.value = '';
 
+        if (isLiveChat) {
+            // Se estiver no chat ao vivo, o bot não responde mais, 
+            // apenas salva a mensagem para o especialista ver
+            return;
+        }
+
         if (currentStep === 'cpf') {
             const cleanCPF = text.replace(/\D/g, '');
             if (cleanCPF.length === 11) {
+                userCpf = cleanCPF; // Salva o CPF para o painel do especialista
+                syncStorage();
+                
                 setTimeout(() => {
                     addMessage("CPF recebido ✔ Consultando condições disponíveis...", 'system');
                     
@@ -113,8 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         const options = `
                             <p>Opções disponíveis:</p>
                             <div class="btn-container">
-                                <button class="chat-btn" onclick="handleAction('escolher_avista')">Pagamento à vista com desconto</button>
-                                <button class="chat-btn secondary" onclick="handleAction('escolher_parcelado')">Parcelamento</button>
+                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
+                                <button class="chat-btn secondary" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                             </div>
                         `;
                         addMessage(null, 'system', options);
