@@ -27,12 +27,17 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage("Olá 👋 Identificamos uma condição especial para regularização do seu contrato.", 'system');
             
             setTimeout(() => {
-                const buttons = `
-                    <div class="btn-container">
-                        <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+                const cardHtml = `
+                    <div class="welcome-card">
+                        <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
+                        <div class="card-content">
+                            <h3>Zere sua dívida hoje!</h3>
+                            <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
+                            <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+                        </div>
                     </div>
                 `;
-                addMessage(null, 'system', buttons);
+                addMessage(null, 'system', cardHtml);
             }, 1000);
         }, 500);
     }

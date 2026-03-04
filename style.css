@@ -8,7 +8,7 @@
 
 body, html {
     height: 100%;
-    background-color: #f0f2f5; /* Fundo neutro */
+    background-color: #d9dbd5; /* Fundo neutro externo */
     overflow: hidden;
 }
 
@@ -19,160 +19,300 @@ body, html {
     height: 100vh;
     max-width: 500px; /* Limite para parecer app no desktop */
     margin: 0 auto;
-    background-color: #fff;
+    background-color: #efeae2; /* Fundo do chat estilo WhatsApp */
     box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    position: relative;
 }
 
 /* Cabeçalho */
 .header {
-    background-color: #075e54;
+    background-color: #008069; /* Verde WhatsApp */
     color: white;
-    padding: 15px 20px;
-    text-align: center;
+    padding: 10px 15px;
     position: sticky;
     top: 0;
     z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-icon {
+    cursor: pointer;
+    opacity: 0.9;
+}
+
+.profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.header-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .header h1 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
+    letter-spacing: 0;
 }
 
 .header p {
-    font-size: 12px;
-    opacity: 0.8;
+    font-size: 13px;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+
+.verified-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Área de Chat */
 .chat-area {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
-    background-color: #e5ddd5; /* Estilo WhatsApp */
+    padding: 20px 15px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); /* Padrão sutil do WhatsApp */
+    background-size: contain;
 }
 
 /* Bolhas de Mensagem */
 .message {
-    max-width: 80%;
-    padding: 10px 15px;
-    border-radius: 10px;
-    font-size: 14px;
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14.5px;
     line-height: 1.4;
     position: relative;
-    animation: fadeIn 0.3s ease;
+    animation: fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    word-wrap: break-word;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(15px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .system-msg {
     align-self: flex-start;
-    background-color: #fff;
-    color: #333;
+    background-color: #ffffff;
+    color: #111b21;
     border-top-left-radius: 0;
+}
+
+.system-msg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -8px;
+    width: 0;
+    height: 0;
+    border-top: 10px solid #ffffff;
+    border-left: 10px solid transparent;
 }
 
 .user-msg {
     align-self: flex-end;
-    background-color: #dcf8c6;
-    color: #333;
+    background-color: #d9fdd3; /* Verde claro WhatsApp */
+    color: #111b21;
     border-top-right-radius: 0;
+}
+
+.user-msg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -8px;
+    width: 0;
+    height: 0;
+    border-top: 10px solid #d9fdd3;
+    border-right: 10px solid transparent;
+}
+
+/* Card de Boas-vindas */
+.welcome-card {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 5px;
+    border: 1px solid #eaeaea;
+}
+
+.card-image {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    display: block;
+}
+
+.card-content {
+    padding: 15px;
+    text-align: center;
+}
+
+.card-content h3 {
+    color: #008069;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.card-content p {
+    color: #555;
+    font-size: 13px;
+    margin-bottom: 15px;
 }
 
 /* Botões no Chat */
 .btn-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 10px;
+    margin-top: 8px;
+    width: 100%;
 }
 
 .chat-btn {
-    background-color: #25d366;
+    background-color: #008069;
     color: white;
     border: none;
-    padding: 10px;
-    border-radius: 5px;
+    padding: 12px;
+    border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
     text-align: center;
     text-decoration: none;
-    font-size: 13px;
+    font-size: 14px;
+    width: 100%;
+    display: inline-block;
+    box-shadow: 0 2px 5px rgba(0, 128, 105, 0.3);
 }
 
 .chat-btn:hover {
-    background-color: #128c7e;
+    background-color: #016b58;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 128, 105, 0.4);
+}
+
+.chat-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0, 128, 105, 0.3);
 }
 
 .chat-btn.secondary {
-    background-color: #fff;
-    color: #075e54;
-    border: 1px solid #075e54;
+    background-color: #ffffff;
+    color: #008069;
+    border: 1px solid #008069;
+    box-shadow: none;
+}
+
+.chat-btn.secondary:hover {
+    background-color: #f0fdf4;
 }
 
 /* Opções de Negociação */
 .option-card {
-    background: #fff;
-    border: 1px solid #ddd;
+    background: #fdfdfd;
+    border: 1px solid #eee;
     border-radius: 8px;
-    padding: 12px;
+    padding: 15px;
     margin-top: 10px;
+    margin-bottom: 5px;
+    border-left: 4px solid #008069;
 }
 
 .option-card h4 {
-    font-size: 14px;
-    color: #075e54;
-    margin-bottom: 5px;
+    font-size: 15px;
+    color: #333;
+    margin-bottom: 8px;
 }
 
 .option-card p {
-    font-size: 13px;
+    font-size: 14px;
     color: #666;
+    margin-bottom: 4px;
 }
 
 .highlight {
-    color: #e53935;
-    font-weight: bold;
+    color: #008069;
+    font-weight: 700;
+    font-size: 16px;
 }
 
 /* Rodapé / Input */
 .footer {
-    padding: 10px;
+    padding: 10px 15px;
     background-color: #f0f2f5;
+    border-top: 1px solid #ddd;
 }
 
 .input-container {
     display: flex;
     gap: 10px;
     background: white;
-    padding: 5px 15px;
+    padding: 8px 15px;
     border-radius: 25px;
     align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 #userInput {
     flex: 1;
     border: none;
-    padding: 10px 0;
+    padding: 8px 0;
     outline: none;
-    font-size: 14px;
+    font-size: 15px;
+    color: #333;
+}
+
+#userInput::placeholder {
+    color: #999;
 }
 
 #sendBtn {
-    background: none;
+    background: #008069;
     border: none;
-    color: #075e54;
+    color: white;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+#sendBtn:hover {
+    background: #016b58;
+}
+
+#sendBtn svg {
+    width: 18px;
+    height: 18px;
+    margin-left: -2px; /* Ajuste visual do ícone de enviar */
 }
 
 /* Responsividade */
