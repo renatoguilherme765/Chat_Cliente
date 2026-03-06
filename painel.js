@@ -1,11 +1,25 @@
 let activeClientId = null;
 
-function renderClients() {
-    let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+async function renderClients() {
+    if (window.supabaseClient) {
+        // Busca do Supabase
+        const { data: liveClients, error } = await window.supabaseClient
+            .from('chat_clients')
+            .select('*')
+            .eq('status', 'live')
+            .order('created_at', { ascending: false });
+            
+        updateClientListUI(liveClients || []);
+    } else {
+        // Busca do localStorage
+        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+        const liveClients = Object.values(chats).filter(chat => chat.isLive);
+        updateClientListUI(liveClients);
+    }
+}
+
+function updateClientListUI(liveClients) {
     const clientList = document.getElementById('clientList');
-    
-    // Filtra apenas os clientes que pediram para falar com especialista
-    const liveClients = Object.values(chats).filter(chat => chat.isLive);
     
     if (liveClients.length === 0) {
         clientList.innerHTML = '<div class="empty-state">Nenhum cliente conectado no momento.</div>';
@@ -18,86 +32,124 @@ function renderClients() {
         const div = document.createElement('div');
         div.className = `client-item ${activeClientId === chat.id ? 'active' : ''}`;
         
-        // Exibe o CPF ou um identificador genérico
         const identifier = chat.cpf !== 'Não informado' ? `CPF: ${chat.cpf}` : 'Cliente Anônimo';
         
         div.innerHTML = `<strong>${identifier}</strong><br><small>Sessão: ${chat.id.substring(0, 12)}</small>`;
-        div.onclick = () => selectClient(chat.id);
+        div.onclick = () => selectClient(chat.id, chat.cpf);
         clientList.appendChild(div);
     });
 }
 
-function selectClient(id) {
+async function selectClient(id, cpf) {
     activeClientId = id;
     document.getElementById('chatInputArea').style.display = 'flex';
     
-    let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-    let chat = chats[id];
-    const identifier = chat.cpf !== 'Não informado' ? `CPF: ${chat.cpf}` : 'Cliente Anônimo';
-    
+    // Se cpf não for passado (caso do localStorage antigo), tenta pegar do chat
+    if (!cpf && !window.supabaseClient) {
+        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+        cpf = chats[id]?.cpf || 'Não informado';
+    }
+
+    const identifier = cpf !== 'Não informado' ? `CPF: ${cpf}` : 'Cliente Anônimo';
     document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}</h2>`;
     
-    renderMessages();
-    renderClients(); // Atualiza a classe 'active' na lista
+    await renderMessages();
+    renderClients();
 }
 
-function renderMessages() {
+async function renderMessages() {
     if (!activeClientId) return;
-    let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-    let chat = chats[activeClientId];
-    if (!chat) return;
 
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = '';
 
-    chat.messages.forEach(msg => {
-        const div = document.createElement('div');
-        
-        // Se a mensagem for do usuário, aparece na esquerda (client-msg)
-        // Se for do sistema ou do agente, aparece na direita (agent-msg)
-        div.className = `message ${msg.type === 'user' ? 'client-msg' : 'agent-msg'}`;
-        
-        if (msg.htmlContent) {
-            div.innerHTML = msg.htmlContent;
-        } else {
-            div.textContent = msg.text;
+    if (window.supabaseClient) {
+        const { data: messages, error } = await window.supabaseClient
+            .from('chat_messages')
+            .select('*')
+            .eq('client_id', activeClientId)
+            .order('created_at', { ascending: true });
+
+        if (messages) {
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
+                div.innerHTML = msg.text;
+                chatMessages.appendChild(div);
+            });
         }
-        chatMessages.appendChild(div);
-    });
+    } else {
+        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+        let chat = chats[activeClientId];
+        if (chat && chat.messages) {
+            chat.messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.type === 'user' ? 'client-msg' : 'agent-msg'}`;
+                if (msg.htmlContent) {
+                    div.innerHTML = msg.htmlContent;
+                } else {
+                    div.textContent = msg.text;
+                }
+                chatMessages.appendChild(div);
+            });
+        }
+    }
     
-    // Rola para o final
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Escuta as mudanças no localStorage (quando o cliente envia mensagem)
-window.addEventListener('storage', (e) => {
-    if (e.key === 'acordo_certo_chats') {
+// Escuta mudanças
+if (window.supabaseClient) {
+    window.supabaseClient.channel('panel-clients')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_clients' }, () => {
+            renderClients();
+        })
+        .subscribe();
+
+    window.supabaseClient.channel('panel-messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+            if (payload.new.client_id === activeClientId) {
+                renderMessages();
+            }
+        })
+        .subscribe();
+} else {
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'acordo_certo_chats') {
+            renderClients();
+            renderMessages();
+        }
+    });
+    setInterval(() => {
         renderClients();
         renderMessages();
-    }
-});
+    }, 2000);
+}
 
 // Envio de mensagem pelo agente
-document.getElementById('agentSendBtn').onclick = () => {
+document.getElementById('agentSendBtn').onclick = async () => {
     const input = document.getElementById('agentInput');
     const text = input.value.trim();
     if (!text || !activeClientId) return;
 
-    let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-    if (chats[activeClientId]) {
-        // Adiciona a mensagem do agente ao histórico do cliente
-        chats[activeClientId].messages.push({
-            text: text,
-            type: 'agent',
-            htmlContent: null
-        });
-        
-        // Salva no localStorage (isso dispara o evento na aba do cliente)
-        localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
-        
-        input.value = '';
-        renderMessages();
+    if (window.supabaseClient) {
+        await window.supabaseClient.from('chat_messages').insert([
+            { client_id: activeClientId, sender: 'agent', text: text }
+        ]);
+    } else {
+        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+        if (chats[activeClientId]) {
+            chats[activeClientId].messages.push({
+                text: text,
+                type: 'agent',
+                htmlContent: null
+            });
+            localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
+        }
     }
+    
+    input.value = '';
+    renderMessages();
 };
 
 // Enviar com Enter
@@ -107,9 +159,3 @@ document.getElementById('agentInput').addEventListener('keypress', (e) => {
 
 // Inicialização
 renderClients();
-
-// Polling de segurança a cada 2 segundos (caso a aba perca algum evento de storage)
-setInterval(() => {
-    renderClients();
-    renderMessages();
-}, 2000);

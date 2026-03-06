@@ -9,6 +9,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let userCpf = 'Não informado';
     let chatHistory = [];
 
+    // Integração com Supabase
+    async function ensureClientExists() {
+        if (!window.supabaseClient) return;
+        await window.supabaseClient.from('chat_clients').upsert([
+            { id: clientId, cpf: userCpf, status: isLiveChat ? 'live' : 'bot' }
+        ], { onConflict: 'id' });
+    }
+
+    async function saveMessageToSupabase(text, type, htmlContent) {
+        if (!window.supabaseClient) return;
+        await ensureClientExists();
+        
+        let sender = type === 'user' ? 'client' : 'bot';
+        let messageText = text || htmlContent;
+        
+        await window.supabaseClient.from('chat_messages').insert([
+            { client_id: clientId, sender: sender, text: messageText }
+        ]);
+    }
+
+    // Escuta mensagens do especialista em tempo real via Supabase
+    if (window.supabaseClient) {
+        window.supabaseClient.channel('public:chat_messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `client_id=eq.${clientId}` }, (payload) => {
+                if (payload.new.sender === 'agent') {
+                    addMessage(payload.new.text, 'system', null, false);
+                }
+            })
+            .subscribe();
+    }
+
     // Sincroniza o chat com o localStorage para o painel do especialista
     function syncStorage() {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
@@ -59,7 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (save) {
             chatHistory.push({ text, type, htmlContent });
-            syncStorage();
+            syncStorage(); // Mantém o fallback local
+            saveMessageToSupabase(text, type, htmlContent); // Envia para o Supabase
         }
     }
 
@@ -148,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addMessage("Aguarde um instante, você será conectado a um especialista.", 'system');
                 isLiveChat = true;
                 syncStorage();
+                ensureClientExists(); // Atualiza o status para 'live' no Supabase
             }, 800);
         } else if (action === 'gerar_pix') {
             addMessage("Gerar PIX", 'user');
@@ -183,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cleanCPF.length === 11) {
                 userCpf = cleanCPF; // Salva o CPF para o painel do especialista
                 syncStorage();
+                ensureClientExists(); // Atualiza o CPF no Supabase
                 
                 setTimeout(() => {
                     addMessage("CPF recebido ✔ Consultando condições disponíveis...", 'system');
