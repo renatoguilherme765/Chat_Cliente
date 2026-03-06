@@ -10,20 +10,51 @@ document.addEventListener('DOMContentLoaded', () => {
     let chatHistory = [];
 
     // Integração com Supabase
+    let ensurePromise = null;
+    let clientEnsured = false;
+
     async function ensureClientExists() {
         if (!window.supabaseClient) return;
-        await window.supabaseClient.from('chat_clients').upsert([
-            { id: clientId, cpf: userCpf, status: isLiveChat ? 'live' : 'bot' }
-        ], { onConflict: 'id' });
+        
+        if (!ensurePromise) {
+            ensurePromise = (async () => {
+                // 1. Verificar se existe cliente na tabela chat_clients
+                const { data } = await window.supabaseClient
+                    .from('chat_clients')
+                    .select('id')
+                    .eq('id', clientId);
+                    
+                // 2. Se não existir, criar automaticamente um novo cliente
+                if (data && data.length === 0) {
+                    await window.supabaseClient.from('chat_clients').insert([
+                        { id: clientId, cpf: userCpf, status: isLiveChat ? 'live' : 'bot' }
+                    ]);
+                }
+            })();
+        }
+        
+        await ensurePromise;
+        
+        // Atualiza os dados caso o CPF ou status tenham mudado
+        if (clientEnsured) {
+            await window.supabaseClient.from('chat_clients').update({
+                cpf: userCpf,
+                status: isLiveChat ? 'live' : 'bot'
+            }).eq('id', clientId);
+        }
+        clientEnsured = true;
     }
 
     async function saveMessageToSupabase(text, type, htmlContent) {
         if (!window.supabaseClient) return;
+        
         await ensureClientExists();
         
+        // 3. Garantir que o campo sender seja "client" para mensagens do usuário
         let sender = type === 'user' ? 'client' : 'bot';
         let messageText = text || htmlContent;
         
+        // 4. O client_id da mensagem deve ser o id criado na tabela chat_clients
         await window.supabaseClient.from('chat_messages').insert([
             { client_id: clientId, sender: sender, text: messageText }
         ]);
