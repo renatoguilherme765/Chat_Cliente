@@ -111,23 +111,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fluxo Inicial
     function initChat() {
-        setTimeout(() => {
-            addMessage("Olá 👋 Identificamos uma condição especial para regularização do seu contrato.", 'system');
-            
+        if (telefoneCliente) {
+            // Fluxo WhatsApp
             setTimeout(() => {
-                const cardHtml = `
-                    <div class="welcome-card">
-                        <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
-                        <div class="card-content">
-                            <h3>Zere sua dívida hoje!</h3>
-                            <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
-                            <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+                const msg = "Olá 👋<br><br>Você está em um ambiente seguro de negociação.<br><br>Para continuar o atendimento digite seu CPF ou CNPJ<br>(apenas números, sem pontos).";
+                addMessage(null, 'system', msg);
+                currentStep = 'cpf_whatsapp';
+            }, 500);
+        } else {
+            // Fluxo Normal
+            setTimeout(() => {
+                addMessage("Olá 👋 Identificamos uma condição especial para regularização do seu contrato.", 'system');
+                
+                setTimeout(() => {
+                    const cardHtml = `
+                        <div class="welcome-card">
+                            <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
+                            <div class="card-content">
+                                <h3>Zere sua dívida hoje!</h3>
+                                <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
+                                <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+                            </div>
                         </div>
-                    </div>
-                `;
-                addMessage(null, 'system', cardHtml);
-            }, 1000);
-        }, 500);
+                    `;
+                    addMessage(null, 'system', cardHtml);
+                }, 1000);
+            }, 500);
+        }
     }
 
     // Manipulador de Ações de Botões
@@ -227,19 +237,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (currentStep === 'cpf') {
+        if (currentStep === 'cpf' || currentStep === 'cpf_whatsapp') {
             const cleanCPF = text.replace(/\D/g, '');
-            if (cleanCPF.length === 11) {
-                setTimeout(() => {
-                    addMessage("CPF recebido ✔ Agora, por favor, digite seu primeiro nome.", 'system');
-                    currentStep = 'nome';
-                }, 800);
+            if (cleanCPF.length >= 11) {
+                if (currentStep === 'cpf_whatsapp') {
+                    setTimeout(() => {
+                        const msg = "Obrigado.<br><br>Agora preciso apenas do seu primeiro nome.";
+                        addMessage(null, 'system', msg);
+                        currentStep = 'nome_whatsapp';
+                    }, 800);
+                } else {
+                    setTimeout(() => {
+                        addMessage("CPF recebido ✔ Agora, por favor, digite seu primeiro nome.", 'system');
+                        currentStep = 'nome';
+                    }, 800);
+                }
             } else {
                 setTimeout(() => {
-                    addMessage("CPF inválido. Por favor, digite os 11 números do seu CPF.", 'system');
+                    if (currentStep === 'cpf_whatsapp') {
+                        addMessage("CPF/CNPJ inválido. Por favor, digite apenas números.", 'system');
+                    } else {
+                        addMessage("CPF inválido. Por favor, digite os 11 números do seu CPF.", 'system');
+                    }
                 }, 800);
             }
-        } else if (currentStep === 'nome') {
+        } else if (currentStep === 'nome' || currentStep === 'nome_whatsapp') {
             userName = text.trim();
             if (userName.length >= 2) {
                 // Atualiza o nome do cliente no Supabase
@@ -249,23 +271,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     }).eq('id', clientId);
                 }
                 
-                setTimeout(() => {
-                    addMessage(`Obrigado, ${userName}! Consultando condições disponíveis...`, 'system');
-                    
+                if (currentStep === 'nome_whatsapp') {
                     setTimeout(() => {
-                        const options = `
-                            <p>Opções disponíveis:</p>
-                            <div class="btn-container">
-                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
-                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
-                                <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
-                                <button class="chat-btn secondary" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
-                            </div>
-                        `;
-                        addMessage(null, 'system', options);
+                        const msg = `Obrigado, ${userName}.<br><br>Você está sendo direcionado para um especialista.<br>Aguarde um instante.`;
+                        addMessage(null, 'system', msg);
                         currentStep = 'done';
-                    }, 1500);
-                }, 800);
+                        isLiveChat = true;
+                    }, 800);
+                } else {
+                    setTimeout(() => {
+                        addMessage(`Obrigado, ${userName}! Consultando condições disponíveis...`, 'system');
+                        
+                        setTimeout(() => {
+                            const options = `
+                                <p>Opções disponíveis:</p>
+                                <div class="btn-container">
+                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
+                                    <button class="chat-btn secondary" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
+                                </div>
+                            `;
+                            addMessage(null, 'system', options);
+                            currentStep = 'done';
+                        }, 1500);
+                    }, 800);
+                }
             } else {
                 setTimeout(() => {
                     addMessage("Por favor, digite um nome válido.", 'system');

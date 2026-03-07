@@ -17,6 +17,7 @@ body, html {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    width: 100%;
     max-width: 500px; /* Limite para parecer app no desktop */
     margin: 0 auto;
     background-color: #efeae2; /* Fundo do chat estilo WhatsApp */
@@ -107,7 +108,7 @@ body, html {
     position: relative;
     animation: fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    word-wrap: break-word;
+    word-break: break-word;
 }
 
 @keyframes fadeIn {
@@ -158,11 +159,13 @@ body, html {
     overflow: hidden;
     margin-top: 5px;
     border: 1px solid #eaeaea;
+    width: 100%;
 }
 
 .card-image {
     width: 100%;
-    height: 160px;
+    height: auto;
+    border-radius: 10px 10px 0 0;
     object-fit: cover;
     display: block;
 }
@@ -283,7 +286,7 @@ body, html {
     border: none;
     padding: 8px 0;
     outline: none;
-    font-size: 15px;
+    font-size: 16px;
     color: #333;
 }
 
@@ -321,5 +324,26 @@ body, html {
         width: 100%;
         max-width: none;
         height: 100vh;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        margin: 0;
+        padding: 0;
+    }
+
+    .app-container {
+        max-width: 100%;
+        height: 100vh;
+    }
+
+    .chat-area {
+        padding: 8px;
+    }
+
+    .input-container {
+        padding: 8px;
+        gap: 8px;
     }
 }
