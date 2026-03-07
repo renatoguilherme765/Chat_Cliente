@@ -32,26 +32,29 @@ function updateClientListUI(liveClients) {
         const div = document.createElement('div');
         div.className = `client-item ${activeClientId === chat.id ? 'active' : ''}`;
         
-        const identifier = chat.cpf !== 'Não informado' ? `CPF: ${chat.cpf}` : 'Cliente Anônimo';
+        const nome = chat.name && chat.name !== 'Cliente' ? chat.name : 'Cliente Anônimo';
+        const telefone = chat.phone ? chat.phone : 'Sem telefone';
         
-        div.innerHTML = `<strong>${identifier}</strong><br><small>Sessão: ${chat.id.substring(0, 12)}</small>`;
-        div.onclick = () => selectClient(chat.id, chat.cpf);
+        div.innerHTML = `<strong>${nome}</strong><br><small>${telefone}</small>`;
+        div.onclick = () => selectClient(chat.id, nome, telefone);
         clientList.appendChild(div);
     });
 }
 
-async function selectClient(id, cpf) {
+async function selectClient(id, nome, telefone) {
     activeClientId = id;
     document.getElementById('chatInputArea').style.display = 'flex';
     
-    // Se cpf não for passado (caso do localStorage antigo), tenta pegar do chat
-    if (!cpf && !window.supabaseClient) {
+    // Se não for passado (caso do localStorage antigo), tenta pegar do chat
+    if (!nome && !window.supabaseClient) {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-        cpf = chats[id]?.cpf || 'Não informado';
+        nome = chats[id]?.name || 'Cliente Anônimo';
+        telefone = chats[id]?.phone || 'Sem telefone';
     }
 
-    const identifier = cpf !== 'Não informado' ? `CPF: ${cpf}` : 'Cliente Anônimo';
-    document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}</h2>`;
+    const identifier = nome !== 'Cliente Anônimo' ? nome : 'Cliente Anônimo';
+    const phoneDisplay = telefone !== 'Sem telefone' ? `<br><small style="font-weight: normal; font-size: 13px; color: #667781;">${telefone}</small>` : '';
+    document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}${phoneDisplay}</h2>`;
     
     await renderMessages();
     renderClients();

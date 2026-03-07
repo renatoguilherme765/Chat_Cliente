@@ -4,105 +4,76 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('sendBtn');
 
     let currentStep = 'start';
-    const clientId = 'cliente_' + Math.random().toString(36).substr(2, 9);
     let isLiveChat = false;
-    let userCpf = 'Não informado';
-    let chatHistory = [];
+    let userName = '';
+    
+    // Capturar telefone da URL
+    const params = new URLSearchParams(window.location.search);
+    const telefone = params.get("telefone") || '';
+    
+    // 1. Gerar client_id como UUID
+    let clientId = localStorage.getItem('acordo_certo_clientId');
+    if (!clientId) {
+        clientId = crypto.randomUUID();
+        localStorage.setItem('acordo_certo_clientId', clientId);
+    }
 
-    // Integração com Supabase
-    let ensurePromise = null;
+    const localMessages = new Set();
     let clientEnsured = false;
 
+    // 3. Garantir que o cliente existe na tabela chat_clients
     async function ensureClientExists() {
-        if (!window.supabaseClient) return;
+        if (!window.supabaseClient || clientEnsured) return;
         
-        if (!ensurePromise) {
-            ensurePromise = (async () => {
-                // 1. Verificar se existe cliente na tabela chat_clients
-                const { data } = await window.supabaseClient
-                    .from('chat_clients')
-                    .select('id')
-                    .eq('id', clientId);
-                    
-                // 2. Se não existir, criar automaticamente um novo cliente
-                if (data && data.length === 0) {
-                    await window.supabaseClient.from('chat_clients').insert([
-                        { id: clientId, cpf: userCpf, status: isLiveChat ? 'live' : 'bot' }
-                    ]);
-                }
-            })();
-        }
-        
-        await ensurePromise;
-        
-        // Atualiza os dados caso o CPF ou status tenham mudado
-        if (clientEnsured) {
-            await window.supabaseClient.from('chat_clients').update({
-                cpf: userCpf,
-                status: isLiveChat ? 'live' : 'bot'
-            }).eq('id', clientId);
+        const { data } = await window.supabaseClient
+            .from('chat_clients')
+            .select('id')
+            .eq('id', clientId);
+            
+        if (!data || data.length === 0) {
+            await window.supabaseClient.from('chat_clients').insert([
+                { id: clientId, name: 'Cliente', phone: telefone, status: 'aguardando' }
+            ]);
         }
         clientEnsured = true;
     }
 
+    // Inicializa a verificação do cliente assim que abre o chat
+    ensureClientExists();
+
+    // 2 e 4. Salvar mensagens no Supabase
     async function saveMessageToSupabase(text, type, htmlContent) {
         if (!window.supabaseClient) return;
-        
         await ensureClientExists();
         
-        // 3. Garantir que o campo sender seja "client" para mensagens do usuário
-        let sender = type === 'user' ? 'client' : 'bot';
+        let sender = type === 'user' ? 'client' : 'specialist';
         let messageText = text || htmlContent;
         
-        // 4. O client_id da mensagem deve ser o id criado na tabela chat_clients
+        localMessages.add(messageText);
+        
         await window.supabaseClient.from('chat_messages').insert([
             { client_id: clientId, sender: sender, text: messageText }
         ]);
     }
 
-    // Escuta mensagens do especialista em tempo real via Supabase
+    // 5. Escutar mensagens em tempo real
     if (window.supabaseClient) {
         window.supabaseClient.channel('public:chat_messages')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `client_id=eq.${clientId}` }, (payload) => {
-                if (payload.new.sender === 'agent') {
-                    addMessage(payload.new.text, 'system', null, false);
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'chat_messages', 
+                filter: `client_id=eq.${clientId}` 
+            }, (payload) => {
+                if (payload.new.sender === 'specialist') {
+                    // Evita duplicar mensagens que o próprio sistema local enviou
+                    if (!localMessages.has(payload.new.text)) {
+                        addMessage(payload.new.text, 'system', null, false);
+                    }
                 }
             })
             .subscribe();
     }
-
-    // Sincroniza o chat com o localStorage para o painel do especialista
-    function syncStorage() {
-        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-        chats[clientId] = {
-            id: clientId,
-            cpf: userCpf,
-            messages: chatHistory,
-            isLive: isLiveChat,
-            lastUpdate: Date.now()
-        };
-        localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
-    }
-
-    // Escuta mensagens vindas do painel do especialista
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'acordo_certo_chats') {
-            let chats = JSON.parse(e.newValue || '{}');
-            let myChat = chats[clientId];
-            
-            // Se o histórico do painel for maior que o local, recebemos mensagem nova
-            if (myChat && myChat.messages.length > chatHistory.length) {
-                let newMsgs = myChat.messages.slice(chatHistory.length);
-                newMsgs.forEach(msg => {
-                    if (msg.type === 'agent') {
-                        // Adiciona a mensagem do agente na tela do cliente sem salvar de volta (loop)
-                        addMessage(msg.text, 'system', msg.htmlContent, false);
-                        chatHistory.push(msg); // Atualiza o histórico local
-                    }
-                });
-            }
-        }
-    });
 
     // Função para adicionar mensagem ao chat
     function addMessage(text, type, htmlContent = null, save = true) {
@@ -120,9 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatArea.scrollTop = chatArea.scrollHeight;
 
         if (save) {
-            chatHistory.push({ text, type, htmlContent });
-            syncStorage(); // Mantém o fallback local
-            saveMessageToSupabase(text, type, htmlContent); // Envia para o Supabase
+            saveMessageToSupabase(text, type, htmlContent);
         }
     }
 
@@ -210,8 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 addMessage("Aguarde um instante, você será conectado a um especialista.", 'system');
                 isLiveChat = true;
-                syncStorage();
-                ensureClientExists(); // Atualiza o status para 'live' no Supabase
+                
+                if (window.supabaseClient) {
+                    window.supabaseClient.from('chat_clients').update({ status: 'live' }).eq('id', clientId);
+                }
             }, 800);
         } else if (action === 'gerar_pix') {
             addMessage("Gerar PIX", 'user');
@@ -245,12 +216,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentStep === 'cpf') {
             const cleanCPF = text.replace(/\D/g, '');
             if (cleanCPF.length === 11) {
-                userCpf = cleanCPF; // Salva o CPF para o painel do especialista
-                syncStorage();
-                ensureClientExists(); // Atualiza o CPF no Supabase
+                setTimeout(() => {
+                    addMessage("CPF recebido ✔ Agora, por favor, digite seu primeiro nome.", 'system');
+                    currentStep = 'nome';
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    addMessage("CPF inválido. Por favor, digite os 11 números do seu CPF.", 'system');
+                }, 800);
+            }
+        } else if (currentStep === 'nome') {
+            userName = text.trim();
+            if (userName.length >= 2) {
+                // Atualiza o nome do cliente no Supabase
+                if (window.supabaseClient) {
+                    window.supabaseClient.from('chat_clients').update({ name: userName }).eq('id', clientId);
+                }
                 
                 setTimeout(() => {
-                    addMessage("CPF recebido ✔ Consultando condições disponíveis...", 'system');
+                    addMessage(`Obrigado, ${userName}! Consultando condições disponíveis...`, 'system');
                     
                     setTimeout(() => {
                         const options = `
@@ -268,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 800);
             } else {
                 setTimeout(() => {
-                    addMessage("CPF inválido. Por favor, digite os 11 números do seu CPF.", 'system');
+                    addMessage("Por favor, digite um nome válido.", 'system');
                 }, 800);
             }
         }
