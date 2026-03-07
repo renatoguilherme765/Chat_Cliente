@@ -111,10 +111,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fluxo Inicial
     function initChat() {
-        if (telefoneCliente) {
-            // Fluxo WhatsApp
+        const isNegociarRoute = window.location.pathname.replace(/\/$/, '') === '/negociar';
+        
+        if (telefoneCliente || isNegociarRoute) {
+            // Fluxo Automático (WhatsApp ou /negociar)
             setTimeout(() => {
-                const msg = "Olá 👋<br><br>Você está em um ambiente seguro de negociação.<br><br>Para continuar o atendimento digite seu CPF ou CNPJ<br>(apenas números, sem pontos).";
+                const msg = "Olá 👋<br><br>Você está em um ambiente seguro de negociação.<br><br>Para dar continuidade ao atendimento digite seu CPF ou CNPJ<br>(apenas números, sem pontos).";
                 addMessage(null, 'system', msg);
                 currentStep = 'cpf_whatsapp';
             }, 500);
@@ -273,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (currentStep === 'nome_whatsapp') {
                     setTimeout(() => {
-                        const msg = `Obrigado, ${userName}.<br><br>Você está sendo direcionado para um especialista.<br>Aguarde um instante.`;
+                        const msg = `Obrigado.<br><br>Você está sendo direcionado para um especialista.<br>Aguarde um instante.`;
                         addMessage(null, 'system', msg);
                         currentStep = 'done';
                         isLiveChat = true;
