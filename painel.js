@@ -6,7 +6,6 @@ async function renderClients() {
         const { data: liveClients, error } = await window.supabaseClient
             .from('chat_clients')
             .select('*')
-            .eq('status', 'live')
             .order('created_at', { ascending: false });
             
         updateClientListUI(liveClients || []);
@@ -32,12 +31,18 @@ function updateClientListUI(liveClients) {
         const div = document.createElement('div');
         div.className = `client-item ${activeClientId === chat.id ? 'active' : ''}`;
         
-        const nome = chat.name && chat.name !== 'Cliente' ? chat.name : 'Cliente Anônimo';
-        const telefone = chat.phone ? chat.phone : 'Sem telefone';
+        const nome = chat.name ? chat.name : 'Cliente Anônimo';
+        const telefone = chat.telefone || chat.phone ? (chat.telefone || chat.phone) : 'Sem telefone';
         
         div.innerHTML = `<strong>${nome}</strong><br><small>${telefone}</small>`;
         div.onclick = () => selectClient(chat.id, nome, telefone);
         clientList.appendChild(div);
+        
+        // Atualiza o cabeçalho se o cliente ativo teve o nome alterado
+        if (activeClientId === chat.id) {
+            const phoneDisplay = telefone !== 'Sem telefone' ? `<br><small style="font-weight: normal; font-size: 13px; color: #667781;">${telefone}</small>` : '';
+            document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${nome}${phoneDisplay}</h2>`;
+        }
     });
 }
 
@@ -49,10 +54,10 @@ async function selectClient(id, nome, telefone) {
     if (!nome && !window.supabaseClient) {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
         nome = chats[id]?.name || 'Cliente Anônimo';
-        telefone = chats[id]?.phone || 'Sem telefone';
+        telefone = chats[id]?.telefone || chats[id]?.phone || 'Sem telefone';
     }
 
-    const identifier = nome !== 'Cliente Anônimo' ? nome : 'Cliente Anônimo';
+    const identifier = nome ? nome : 'Cliente Anônimo';
     const phoneDisplay = telefone !== 'Sem telefone' ? `<br><small style="font-weight: normal; font-size: 13px; color: #667781;">${telefone}</small>` : '';
     document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}${phoneDisplay}</h2>`;
     

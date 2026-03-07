@@ -8,43 +8,57 @@ document.addEventListener('DOMContentLoaded', () => {
     let userName = '';
     
     // Capturar telefone da URL
-    const params = new URLSearchParams(window.location.search);
-    const telefone = params.get("telefone") || '';
+    const urlParams = new URLSearchParams(window.location.search);
+    const telefoneCliente = urlParams.get("tel") || urlParams.get("telefone") || '';
     
-    // 1. Gerar client_id como UUID
-    let clientId = localStorage.getItem('acordo_certo_clientId');
-    if (!clientId) {
-        clientId = crypto.randomUUID();
-        localStorage.setItem('acordo_certo_clientId', clientId);
-    }
+    // 1. Gerar client_id como UUID ou usar o telefone da URL
+    const clientId = telefoneCliente || crypto.randomUUID();
 
     const localMessages = new Set();
     let clientEnsured = false;
 
-    // 3. Garantir que o cliente existe na tabela chat_clients
-    async function ensureClientExists() {
-        if (!window.supabaseClient || clientEnsured) return;
+    // 3. Criar cliente na tabela chat_clients
+    let clientCreated = false;
+    let createClientPromise = null;
+    
+    async function createClientIfNotExists() {
+        if (!window.supabaseClient || clientCreated) return;
         
-        const { data } = await window.supabaseClient
-            .from('chat_clients')
-            .select('id')
-            .eq('id', clientId);
-            
-        if (!data || data.length === 0) {
-            await window.supabaseClient.from('chat_clients').insert([
-                { id: clientId, name: 'Cliente', phone: telefone, status: 'aguardando' }
-            ]);
+        if (!createClientPromise) {
+            createClientPromise = (async () => {
+                const { data } = await window.supabaseClient
+                    .from('chat_clients')
+                    .select('id')
+                    .eq('id', clientId);
+                    
+                if (!data || data.length === 0) {
+                    const insertData = {
+                        id: clientId,
+                        name: "Cliente",
+                        status: "aguardando"
+                    };
+                    
+                    if (telefoneCliente) {
+                        insertData.telefone = telefoneCliente;
+                    }
+                    
+                    await window.supabaseClient
+                        .from('chat_clients')
+                        .insert([insertData]);
+                }
+                clientCreated = true;
+            })();
         }
-        clientEnsured = true;
+        await createClientPromise;
     }
 
     // Inicializa a verificação do cliente assim que abre o chat
-    ensureClientExists();
+    createClientIfNotExists();
 
     // 2 e 4. Salvar mensagens no Supabase
     async function saveMessageToSupabase(text, type, htmlContent) {
         if (!window.supabaseClient) return;
-        await ensureClientExists();
+        await createClientIfNotExists();
         
         let sender = type === 'user' ? 'client' : 'specialist';
         let messageText = text || htmlContent;
@@ -200,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Lógica de Envio de Mensagem
-    function handleSend() {
+    async function handleSend() {
         const text = userInput.value.trim();
         if (!text) return;
 
@@ -230,7 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userName.length >= 2) {
                 // Atualiza o nome do cliente no Supabase
                 if (window.supabaseClient) {
-                    window.supabaseClient.from('chat_clients').update({ name: userName }).eq('id', clientId);
+                    await window.supabaseClient.from('chat_clients').update({ 
+                        name: userName
+                    }).eq('id', clientId);
                 }
                 
                 setTimeout(() => {
