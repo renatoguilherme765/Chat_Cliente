@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Redirecionamento amigável
+    if (window.location.pathname.replace(/\/$/, '') === '/negociar') {
+        window.location.replace('/?origem=whatsapp');
+        return; // Para a execução do script atual
+    }
+
     const chatArea = document.getElementById('chatArea');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -10,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Capturar telefone da URL
     const urlParams = new URLSearchParams(window.location.search);
     const telefoneCliente = urlParams.get("tel") || urlParams.get("telefone") || '';
+    const origem = urlParams.get("origem");
     
     // 1. Gerar client_id como UUID ou usar o telefone da URL
     const clientId = telefoneCliente || crypto.randomUUID();
@@ -112,11 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fluxo Inicial
     function initChat() {
         const isNegociarRoute = window.location.pathname.replace(/\/$/, '') === '/negociar';
+        const isWhatsappOrigin = origem === 'whatsapp';
         
-        if (telefoneCliente || isNegociarRoute) {
+        if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
             // Fluxo Automático (WhatsApp ou /negociar)
             setTimeout(() => {
-                const msg = "Olá 👋<br><br>Você está em um ambiente seguro de negociação.<br><br>Para dar continuidade ao atendimento digite seu CPF ou CNPJ<br>(apenas números, sem pontos).";
+                const msg = "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
                 addMessage(null, 'system', msg);
                 currentStep = 'cpf_whatsapp';
             }, 500);
@@ -244,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cleanCPF.length >= 11) {
                 if (currentStep === 'cpf_whatsapp') {
                     setTimeout(() => {
-                        const msg = "Obrigado.<br><br>Agora preciso apenas do seu primeiro nome.";
+                        const msg = "Agora preciso apenas do seu primeiro nome.";
                         addMessage(null, 'system', msg);
                         currentStep = 'nome_whatsapp';
                     }, 800);
@@ -275,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (currentStep === 'nome_whatsapp') {
                     setTimeout(() => {
-                        const msg = `Obrigado.<br><br>Você está sendo direcionado para um especialista.<br>Aguarde um instante.`;
+                        const msg = `Obrigado. Você está sendo conectado a um especialista.`;
                         addMessage(null, 'system', msg);
                         currentStep = 'done';
                         isLiveChat = true;
