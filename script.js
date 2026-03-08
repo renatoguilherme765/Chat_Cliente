@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (payload.new.sender === 'specialist') {
                     // Evita duplicar mensagens que o próprio sistema local enviou
                     if (!localMessages.has(payload.new.text)) {
-                        addMessage(payload.new.text, 'system', null, false);
+                        addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
                     }
                 }
             })
@@ -108,20 +108,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Função para adicionar mensagem ao chat
-    function addMessage(text, type, htmlContent = null, save = true) {
+    function addMessage(text, type, htmlContent = null, save = true, createdAt = null) {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('message');
         msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
         
+        const contentDiv = document.createElement('div');
+        contentDiv.classList.add('message-text');
+        
         if (htmlContent) {
-            msgDiv.innerHTML = htmlContent;
+            contentDiv.innerHTML = htmlContent;
         } else if (text) {
             if (type === 'system') {
-                msgDiv.innerHTML = text;
+                contentDiv.innerHTML = text;
             } else {
-                msgDiv.textContent = text;
+                contentDiv.textContent = text;
             }
         }
+        
+        msgDiv.appendChild(contentDiv);
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.classList.add('message-time');
+        
+        const dateObj = createdAt ? new Date(createdAt) : new Date();
+        timeDiv.textContent = dateObj.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        msgDiv.appendChild(timeDiv);
 
         chatArea.appendChild(msgDiv);
         chatArea.scrollTop = chatArea.scrollHeight;
@@ -145,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             messages.forEach(msg => {
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
-                addMessage(msg.text, type, null, false);
+                addMessage(msg.text, type, null, false, msg.created_at);
             });
             
             // Verifica o status do cliente para saber se já está em atendimento
