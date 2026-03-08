@@ -6,6 +6,7 @@ async function renderClients() {
         const { data: liveClients, error } = await window.supabaseClient
             .from('chat_clients')
             .select('*')
+            .in('status', ['aguardando', 'em_atendimento'])
             .order('created_at', { ascending: false });
             
         updateClientListUI(liveClients || []);
@@ -142,14 +143,15 @@ document.getElementById('agentSendBtn').onclick = async () => {
 
     if (window.supabaseClient) {
         await window.supabaseClient.from('chat_messages').insert([
-            { client_id: activeClientId, sender: 'agent', text: text }
+            { client_id: activeClientId, sender: 'specialist', text: text }
         ]);
+        await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
     } else {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
         if (chats[activeClientId]) {
             chats[activeClientId].messages.push({
                 text: text,
-                type: 'agent',
+                type: 'specialist',
                 htmlContent: null
             });
             localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));

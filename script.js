@@ -18,8 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const telefoneCliente = urlParams.get("tel") || urlParams.get("telefone") || '';
     const origem = urlParams.get("origem");
     
-    // 1. Gerar client_id como UUID ou usar o telefone da URL
-    const clientId = telefoneCliente || crypto.randomUUID();
+    // 1. Recuperar ou gerar client_id
+    let clientId = localStorage.getItem("chat_client_id");
+    let isReturningClient = !!clientId;
+
+    // Se a URL trouxer um telefone diferente do salvo, assumimos que é um novo acesso
+    if (telefoneCliente && telefoneCliente !== clientId) {
+        clientId = telefoneCliente;
+        localStorage.setItem("chat_client_id", clientId);
+        isReturningClient = false;
+    } else if (!clientId) {
+        clientId = crypto.randomUUID();
+        localStorage.setItem("chat_client_id", clientId);
+    }
 
     const localMessages = new Set();
     let clientEnsured = false;
@@ -42,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const insertData = {
                         id: clientId,
                         name: "Cliente",
-                        status: "aguardando"
+                        status: "bot"
                     };
                     
                     if (telefoneCliente) {
@@ -105,7 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (htmlContent) {
             msgDiv.innerHTML = htmlContent;
         } else if (text) {
-            msgDiv.textContent = text;
+            if (type === 'system') {
+                msgDiv.innerHTML = text;
+            } else {
+                msgDiv.textContent = text;
+            }
         }
 
         chatArea.appendChild(msgDiv);
@@ -116,8 +131,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Função para carregar histórico de mensagens
+    async function loadExistingMessages() {
+        if (!window.supabaseClient) return false;
+        
+        const { data: messages, error } = await window.supabaseClient
+            .from('chat_messages')
+            .select('*')
+            .eq('client_id', clientId)
+            .order('created_at', { ascending: true });
+            
+        if (messages && messages.length > 0) {
+            messages.forEach(msg => {
+                const type = msg.sender === 'client' ? 'user' : 'system';
+                // Adiciona a mensagem sem salvar novamente no banco
+                addMessage(msg.text, type, null, false);
+            });
+            
+            // Verifica o status do cliente para saber se já está em atendimento
+            const { data: clientData } = await window.supabaseClient
+                .from('chat_clients')
+                .select('status')
+                .eq('id', clientId)
+                .single();
+                
+            if (clientData && (clientData.status === 'em_atendimento' || clientData.status === 'aguardando')) {
+                isLiveChat = true;
+                currentStep = 'done';
+            }
+            return true;
+        }
+        return false;
+    }
+
     // Fluxo Inicial
-    function initChat() {
+    async function initChat() {
         const isNegociarRoute = window.location.pathname.replace(/\/$/, '') === '/negociar';
         const isWhatsappOrigin = origem === 'whatsapp';
         
@@ -131,6 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.placeholder = "Digite sua mensagem...";
         userInput.disabled = false;
         sendBtn.disabled = false;
+        
+        // Tentar carregar histórico se for cliente retornando
+        if (isReturningClient) {
+            const hasHistory = await loadExistingMessages();
+            if (hasHistory) {
+                return; // Se já tem histórico, não roda o fluxo inicial de boas vindas
+            }
+        }
         
         if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
             // Fluxo Automático (WhatsApp ou /negociar)
@@ -221,12 +277,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 800);
         } else if (action === 'falar_especialista') {
             addMessage("4️⃣ Falar com um especialista", 'user');
-            setTimeout(() => {
+            setTimeout(async () => {
                 addMessage("Aguarde um instante, você será conectado a um especialista.", 'system');
                 isLiveChat = true;
                 
                 if (window.supabaseClient) {
-                    window.supabaseClient.from('chat_clients').update({ status: 'live' }).eq('id', clientId);
+                    await createClientIfNotExists();
+                    await window.supabaseClient.from('chat_clients').update({ status: 'aguardando' }).eq('id', clientId);
                 }
             }, 800);
         } else if (action === 'gerar_pix') {
@@ -293,14 +350,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (currentStep === 'nome_whatsapp') {
-                    setTimeout(() => {
+                    setTimeout(async () => {
                         const msg = `Obrigado. Você está sendo conectado a um especialista.`;
                         addMessage(null, 'system', msg);
                         currentStep = 'done';
                         isLiveChat = true;
                         
                         if (window.supabaseClient) {
-                            window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', clientId);
+                            await createClientIfNotExists();
+                            await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', clientId);
                         }
                     }, 800);
                 } else {
