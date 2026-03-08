@@ -18,19 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const telefoneCliente = urlParams.get("tel") || urlParams.get("telefone") || '';
     const origem = urlParams.get("origem");
     
-    // 1. Recuperar ou gerar client_id
-    let clientId = localStorage.getItem("chat_client_id");
-    let isReturningClient = !!clientId;
-
-    // Se a URL trouxer um telefone diferente do salvo, assumimos que é um novo acesso
-    if (telefoneCliente && telefoneCliente !== clientId) {
-        clientId = telefoneCliente;
-        localStorage.setItem("chat_client_id", clientId);
-        isReturningClient = false;
-    } else if (!clientId) {
-        clientId = crypto.randomUUID();
-        localStorage.setItem("chat_client_id", clientId);
-    }
+    // 1. Gerar novo client_id a cada carregamento
+    let clientId = crypto.randomUUID();
+    let isReturningClient = false;
+    
+    // Remover qualquer client_id salvo anteriormente para garantir o reset
+    localStorage.removeItem("chat_client_id");
 
     const localMessages = new Set();
     let clientEnsured = false;
