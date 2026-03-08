@@ -327,18 +327,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentStep === 'cpf' || currentStep === 'cpf_whatsapp') {
             const cleanCPF = text.replace(/\D/g, '');
             if (cleanCPF.length >= 11) {
-                if (currentStep === 'cpf_whatsapp') {
+                const isCNPJ = cleanCPF.length >= 14;
+                const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
+                
+                setTimeout(() => {
+                    addMessage(confirmMsg, 'system');
+                    
                     setTimeout(() => {
-                        const msg = "Agora preciso apenas do seu primeiro nome.";
-                        addMessage(null, 'system', msg);
-                        currentStep = 'nome_whatsapp';
+                        addMessage("Agora, por favor, digite seu primeiro nome.", 'system');
+                        currentStep = currentStep === 'cpf_whatsapp' ? 'nome_whatsapp' : 'nome';
                     }, 800);
-                } else {
-                    setTimeout(() => {
-                        addMessage("CPF recebido ✔ Agora, por favor, digite seu primeiro nome.", 'system');
-                        currentStep = 'nome';
-                    }, 800);
-                }
+                }, 800);
             } else {
                 setTimeout(() => {
                     if (currentStep === 'cpf_whatsapp') {
