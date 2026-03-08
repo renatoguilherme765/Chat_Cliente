@@ -121,6 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const isNegociarRoute = window.location.pathname.replace(/\/$/, '') === '/negociar';
         const isWhatsappOrigin = origem === 'whatsapp';
         
+        // Garantir que o campo de digitação esteja visível e ativo
+        const footer = document.querySelector('.footer');
+        if (footer) {
+            footer.style.display = 'block';
+            footer.style.visibility = 'visible';
+            footer.style.opacity = '1';
+        }
+        userInput.placeholder = "Digite sua mensagem...";
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        
         if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
             // Fluxo Automático (WhatsApp ou /negociar)
             setTimeout(() => {
@@ -287,6 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         addMessage(null, 'system', msg);
                         currentStep = 'done';
                         isLiveChat = true;
+                        
+                        if (window.supabaseClient) {
+                            window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', clientId);
+                        }
                     }, 800);
                 } else {
                     setTimeout(() => {

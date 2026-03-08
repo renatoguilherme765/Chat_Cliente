@@ -16,7 +16,7 @@ body, html {
 .app-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100dvh; /* Usa dvh para mobile */
     width: 100%;
     max-width: 500px; /* Limite para parecer app no desktop */
     margin: 0 auto;
@@ -269,6 +269,11 @@ body, html {
     padding: 10px 15px;
     background-color: #f0f2f5;
     border-top: 1px solid #ddd;
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    width: 100%;
 }
 
 .input-container {
@@ -323,7 +328,7 @@ body, html {
     .app-container {
         width: 100%;
         max-width: none;
-        height: 100vh;
+        height: 100dvh;
     }
 }
 
@@ -335,7 +340,7 @@ body, html {
 
     .app-container {
         max-width: 100%;
-        height: 100vh;
+        height: 100dvh;
     }
 
     .chat-area {
