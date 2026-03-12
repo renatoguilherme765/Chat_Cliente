@@ -350,18 +350,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (currentStep === 'nome' || currentStep === 'nome_whatsapp') {
             userName = text.trim();
             if (userName.length >= 2) {
-                // Atualiza o nome do cliente no Supabase
+                // Atualiza o nome do cliente no Supabase sem bloquear o fluxo
                 if (window.supabaseClient) {
-                    await window.supabaseClient.from('chat_clients').update({ 
+                    window.supabaseClient.from('chat_clients').update({ 
                         name: userName
-                    }).eq('id', clientId);
+                    }).eq('id', clientId).then();
                 }
                 
                 if (currentStep === 'nome_whatsapp') {
                     setTimeout(async () => {
                         const msg = `Obrigado. Você está sendo conectado a um especialista.`;
                         addMessage(null, 'system', msg);
-                        currentStep = 'done';
+                        currentStep = 'nome_recebido';
                         isLiveChat = true;
                         
                         if (window.supabaseClient) {
@@ -377,20 +377,35 @@ document.addEventListener('DOMContentLoaded', () => {
                             const options = `
                                 <p>Opções disponíveis:</p>
                                 <div class="btn-container">
-                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
-                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
-                                    <button class="chat-btn" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
-                                    <button class="chat-btn secondary" style="text-align: left; font-size: 13px; padding: 10px;" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
+                                    <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                    <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
+                                    <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                                 </div>
                             `;
                             addMessage(null, 'system', options);
-                            currentStep = 'done';
+                            currentStep = 'nome_recebido';
                         }, 1500);
                     }, 800);
                 }
             } else {
                 setTimeout(() => {
                     addMessage("Por favor, digite um nome válido.", 'system');
+                }, 800);
+            }
+        } else if (currentStep === 'nome_recebido') {
+            const option = text.trim();
+            if (option === '1') {
+                handleAction('pagamento_total');
+            } else if (option === '2') {
+                handleAction('renegociacao_carencia');
+            } else if (option === '3') {
+                handleAction('entrega_amigavel');
+            } else if (option === '4') {
+                handleAction('falar_especialista');
+            } else {
+                setTimeout(() => {
+                    addMessage("Por favor, escolha uma das opções acima clicando nos botões ou digitando o número correspondente (1, 2, 3 ou 4).", 'system');
                 }, 800);
             }
         }
