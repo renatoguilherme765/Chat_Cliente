@@ -76,21 +76,21 @@ document.addEventListener('DOMContentLoaded', () => {
         
         localMessages.add(messageText);
         
-        await window.supabaseClient.from('chat_messages').insert([
+        await window.supabaseClient.from('messages').insert([
             { client_id: clientId, sender: sender, text: messageText }
         ]);
     }
 
     // 5. Escutar mensagens em tempo real
     if (window.supabaseClient) {
-        window.supabaseClient.channel('public:chat_messages')
+        window.supabaseClient.channel('messages')
             .on('postgres_changes', { 
-                event: 'INSERT', 
+                event: '*', 
                 schema: 'public', 
-                table: 'chat_messages', 
+                table: 'messages', 
                 filter: `client_id=eq.${clientId}` 
             }, (payload) => {
-                if (payload.new.sender === 'specialist') {
+                if (payload.eventType === 'INSERT' && payload.new.sender === 'specialist') {
                     // Evita duplicar mensagens que o próprio sistema local enviou
                     if (!localMessages.has(payload.new.text)) {
                         addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.supabaseClient) return false;
         
         const { data: messages, error } = await window.supabaseClient
-            .from('chat_messages')
+            .from('messages')
             .select('*')
             .eq('client_id', clientId)
             .order('created_at', { ascending: true });
