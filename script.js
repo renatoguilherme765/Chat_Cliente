@@ -76,21 +76,22 @@ document.addEventListener('DOMContentLoaded', () => {
         
         localMessages.add(messageText);
         
-        await window.supabaseClient.from('messages').insert([
-            { client_id: clientId, sender: sender, text: messageText }
-        ]);
+        await window.supabaseClient.from('messages').insert({
+            client_id: clientId,
+            sender: sender,
+            text: messageText
+        });
     }
 
     // 5. Escutar mensagens em tempo real
     if (window.supabaseClient) {
         window.supabaseClient.channel('messages')
             .on('postgres_changes', { 
-                event: '*', 
+                event: 'INSERT', 
                 schema: 'public', 
-                table: 'messages', 
-                filter: `client_id=eq.${clientId}` 
+                table: 'messages'
             }, (payload) => {
-                if (payload.eventType === 'INSERT' && payload.new.sender === 'specialist') {
+                if (payload.new.client_id === clientId && payload.new.sender === 'specialist') {
                     // Evita duplicar mensagens que o próprio sistema local enviou
                     if (!localMessages.has(payload.new.text)) {
                         addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
@@ -212,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     const cardHtml = `
                         <div class="welcome-card">
-                            <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
+                            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
                             <div class="card-content">
                                 <h3>Zere sua dívida hoje!</h3>
                                 <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>

@@ -116,8 +116,12 @@ if (window.supabaseClient) {
         .subscribe();
 
     window.supabaseClient.channel('messages')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
-            if (payload.eventType === 'INSERT' && payload.new.client_id === activeClientId) {
+        .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages' 
+        }, (payload) => {
+            if (payload.new.client_id === activeClientId) {
                 renderMessages();
             }
         })
@@ -142,9 +146,11 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (!text || !activeClientId) return;
 
     if (window.supabaseClient) {
-        await window.supabaseClient.from('messages').insert([
-            { client_id: activeClientId, sender: 'specialist', text: text }
-        ]);
+        await window.supabaseClient.from('messages').insert({
+            client_id: activeClientId,
+            sender: 'specialist',
+            text: text
+        });
         await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
     } else {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
