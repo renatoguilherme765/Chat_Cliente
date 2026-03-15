@@ -74,7 +74,7 @@ async function renderMessages() {
 
     if (window.supabaseClient) {
         const { data: messages, error } = await window.supabaseClient
-            .from('messages')
+            .from('chat_messages')
             .select('*')
             .eq('client_id', activeClientId)
             .order('created_at', { ascending: true });
@@ -115,11 +115,11 @@ if (window.supabaseClient) {
         })
         .subscribe();
 
-    window.supabaseClient.channel('messages')
+    window.supabaseClient.channel('chat_messages')
         .on('postgres_changes', { 
             event: 'INSERT', 
             schema: 'public', 
-            table: 'messages' 
+            table: 'chat_messages' 
         }, (payload) => {
             if (payload.new.client_id === activeClientId) {
                 renderMessages();
@@ -146,10 +146,11 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (!text || !activeClientId) return;
 
     if (window.supabaseClient) {
-        await window.supabaseClient.from('messages').insert({
+        await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
             sender: 'specialist',
-            text: text
+            text: text,
+            created_at: new Date()
         });
         await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
     } else {
