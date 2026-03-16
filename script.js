@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     const cardHtml = `
                         <div class="welcome-card">
-                            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Pessoa feliz" class="card-image" referrerPolicy="no-referrer">
+                            <img src="https://image.pollinations.ai/prompt/person-paying-bills-on-smartphone-smiling?width=400&height=250&nologo=true" alt="Pessoa pagando dívida" class="card-image">
                             <div class="card-content">
                                 <h3>Zere sua dívida hoje!</h3>
                                 <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>

@@ -196,6 +196,17 @@ body, html {
     margin-bottom: 15px;
 }
 
+.welcome-card .chat-btn {
+    padding: 14px 24px;
+    font-size: 16px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 5px;
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+}
+
 /* Botões no Chat */
 .btn-container {
     display: flex;
