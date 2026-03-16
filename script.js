@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     const cardHtml = `
                         <div class="welcome-card">
-                            <img src="https://image.pollinations.ai/prompt/person-paying-bills-on-smartphone-smiling?width=400&height=250&nologo=true" alt="Pessoa pagando dívida" class="card-image">
+                            <img src="https://image.pollinations.ai/prompt/A%20happy%20brazilian%20person%20paying%20a%20paper%20bill%20boleto%20using%20a%20smartphone%20camera%2C%20realistic%20photography?width=400&height=250&nologo=true&seed=999" alt="Pessoa pagando boleto" class="card-image" width="400" height="250" style="min-width: 250px; min-height: 150px; background-color: #f0f0f0;" loading="lazy" referrerPolicy="no-referrer" crossorigin="anonymous">
                             <div class="card-content">
                                 <h3>Zere sua dívida hoje!</h3>
                                 <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
