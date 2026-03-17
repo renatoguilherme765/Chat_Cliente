@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     const cardHtml = `
                         <div class="welcome-card">
-                            <img src="https://image.pollinations.ai/prompt/A%20happy%20brazilian%20person%20paying%20a%20paper%20bill%20boleto%20using%20a%20smartphone%20camera%2C%20realistic%20photography?width=400&height=250&nologo=true&seed=999" alt="Pessoa pagando boleto" class="card-image" width="400" height="250" style="min-width: 250px; min-height: 150px; background-color: #f0f0f0;" loading="lazy" referrerPolicy="no-referrer" crossorigin="anonymous">
+                            <img src="https://images.pexels.com/photos/3769021/pexels-photo-3769021.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Mulher feliz olhando para o celular" class="card-image" style="width: 100%; height: 200px; object-fit: cover; object-position: center 30%; border-radius: 10px 10px 0 0; background-color: #e0e0e0; display: block;" referrerpolicy="no-referrer">
                             <div class="card-content">
                                 <h3>Zere sua dívida hoje!</h3>
                                 <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
@@ -246,11 +246,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const content = `
                         <div class="option-card">
                             <h4>Pagamento à Vista</h4>
-                            <p>De: R$ 8.200,00</p>
-                            <p>Por: <span class="highlight">R$ 5.000,00</span></p>
+                            <p>De: 20% de desconto</p>
+                            <p>Por: <span class="highlight">até 70% de desconto</span></p>
                         </div>
                         <div class="btn-container">
-                            <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar PIX</button>
+                            <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar boleto com desconto</button>
                             <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">Falar com especialista</button>
                         </div>
                     `;
