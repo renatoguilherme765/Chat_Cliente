@@ -156,6 +156,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
         if (messages && messages.length > 0) {
             messages.forEach(msg => {
+                // Não mostra a mensagem oculta de solicitação de boleto para o cliente
+                if (msg.text === "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.") return;
+                
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
                 addMessage(msg.text, type, null, false, msg.created_at);
@@ -250,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p>Por: <span class="highlight">até 70% de desconto</span></p>
                         </div>
                         <div class="btn-container">
-                            <button class="chat-btn" onclick="handleAction('gerar_pix')">Gerar boleto com desconto</button>
+                            <button class="chat-btn" onclick="handleAction('gerar_boleto')">Gerar boleto com desconto</button>
                             <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">Falar com especialista</button>
                         </div>
                     `;
@@ -299,17 +302,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     await window.supabaseClient.from('chat_clients').update({ status: 'aguardando' }).eq('id', clientId);
                 }
             }, 800);
-        } else if (action === 'gerar_pix') {
-            addMessage("Gerar PIX", 'user');
+        } else if (action === 'gerar_boleto') {
+            addMessage("Gerar boleto com desconto", 'user');
             setTimeout(() => {
-                const content = `
-                    <p>Aqui está o código PIX Copia e Cola:</p>
-                    <div class="option-card" style="word-break: break-all; font-family: monospace; font-size: 12px; background: #f4f4f4;">
-                        00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266554400005204000053039865406500.005802BR5913Empresa Teste6008SAO PAULO62070503***63041A2B
-                    </div>
-                    <p style="margin-top: 10px; font-size: 12px;">Válido por 24 horas.</p>
-                `;
-                addMessage(null, 'system', content);
+                addMessage("Só um instante, estamos gerando o boleto com os descontos, mostraremos o valor de pagamento e vencimento do boleto.", 'system');
+                setTimeout(() => {
+                    const content = `
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px 0;">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: pulse 1.5s infinite;">
+                                <rect x="3" y="4" width="18" height="16" rx="2" stroke="#008069" stroke-width="2"/>
+                                <path d="M7 8H17" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M7 12H17" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M7 16H13" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="6" y1="2" x2="6" y2="4" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="10" y1="2" x2="10" y2="4" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="14" y1="2" x2="14" y2="4" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="18" y1="2" x2="18" y2="4" stroke="#008069" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <p style="margin-top: 12px; font-size: 13px; color: #666; font-weight: 500;">Gerando boleto...</p>
+                        </div>
+                    `;
+                    addMessage(null, 'system', content);
+                    
+                    setTimeout(async () => {
+                        isLiveChat = true;
+                        if (window.supabaseClient) {
+                            await createClientIfNotExists();
+                            // Envia uma mensagem para o especialista (aparecerá no painel como se fosse do cliente)
+                            await window.supabaseClient.from('chat_messages').insert([
+                                {
+                                    client_id: clientId,
+                                    text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
+                                    sender: 'client',
+                                    created_at: new Date()
+                                }
+                            ]);
+                            await window.supabaseClient.from('chat_clients').update({ status: 'aguardando' }).eq('id', clientId);
+                        }
+                    }, 1000);
+                }, 1000);
             }, 800);
         }
     };
