@@ -123,9 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     isFile = true;
                     const isImage = parsed.name.match(/\.(png|jpg|jpeg|gif)$/i);
                     if (isImage) {
-                        contentDiv.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                        contentDiv.innerHTML = `<img src="${parsed.url}" class="max-w-xs rounded-lg" />`;
                     } else {
-                        contentDiv.innerHTML = `<a href="${parsed.url}" target="_blank" style="color: #008069; text-decoration: underline;">📎 ${parsed.name}</a>`;
+                        contentDiv.innerHTML = `<a href="${parsed.url}" target="_blank" class="text-blue-600 underline">📎 ${parsed.name}</a>`;
                     }
                 }
             } catch (e) {}
