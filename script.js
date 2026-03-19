@@ -177,7 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
-               let parsed;
+let parsed;
+
 try {
   parsed = JSON.parse(msg.text);
 } catch {
@@ -194,6 +195,7 @@ if (parsed && parsed.__isFile) {
 
 } else {
   addMessage(msg.text, type, null, false, msg.created_at);
+}
 }
             });
             
