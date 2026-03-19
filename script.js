@@ -177,7 +177,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
-                addMessage(msg.text, type, null, false, msg.created_at);
+               let parsed;
+try {
+  parsed = JSON.parse(msg.text);
+} catch {
+  parsed = null;
+}
+
+if (parsed && parsed.__isFile) {
+
+  if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+    addMessage(`<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, type, null, true, msg.created_at);
+  } else {
+    addMessage(`<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, type, null, true, msg.created_at);
+  }
+
+} else {
+  addMessage(msg.text, type, null, false, msg.created_at);
+}
             });
             
             // Verifica o status do cliente para saber se já está em atendimento
