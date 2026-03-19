@@ -83,7 +83,25 @@ async function renderMessages() {
             messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
-                div.innerHTML = msg.text;
+                
+                let isFile = false;
+                try {
+                    const parsed = JSON.parse(msg.text);
+                    if (parsed && parsed.__isFile) {
+                        isFile = true;
+                        const isImage = parsed.name.match(/\.(png|jpg|jpeg|gif)$/i);
+                        if (isImage) {
+                            div.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                        } else {
+                            div.innerHTML = `<a href="${parsed.url}" target="_blank" style="color: #008069; text-decoration: underline;">📎 ${parsed.name}</a>`;
+                        }
+                    }
+                } catch (e) {}
+
+                if (!isFile) {
+                    div.innerHTML = msg.text;
+                }
+                
                 chatMessages.appendChild(div);
             });
         }
@@ -97,7 +115,23 @@ async function renderMessages() {
                 if (msg.htmlContent) {
                     div.innerHTML = msg.htmlContent;
                 } else {
-                    div.textContent = msg.text;
+                    let isFile = false;
+                    try {
+                        const parsed = JSON.parse(msg.text);
+                        if (parsed && parsed.__isFile) {
+                            isFile = true;
+                            const isImage = parsed.name.match(/\.(png|jpg|jpeg|gif)$/i);
+                            if (isImage) {
+                                div.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                            } else {
+                                div.innerHTML = `<a href="${parsed.url}" target="_blank" style="color: #008069; text-decoration: underline;">📎 ${parsed.name}</a>`;
+                            }
+                        }
+                    } catch (e) {}
+
+                    if (!isFile) {
+                        div.textContent = msg.text;
+                    }
                 }
                 chatMessages.appendChild(div);
             });

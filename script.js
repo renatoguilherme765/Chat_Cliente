@@ -116,10 +116,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (htmlContent) {
             contentDiv.innerHTML = htmlContent;
         } else if (text) {
-            if (type === 'system') {
-                contentDiv.innerHTML = text;
-            } else {
-                contentDiv.textContent = text;
+            let isFile = false;
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed && parsed.__isFile) {
+                    isFile = true;
+                    const isImage = parsed.name.match(/\.(png|jpg|jpeg|gif)$/i);
+                    if (isImage) {
+                        contentDiv.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                    } else {
+                        contentDiv.innerHTML = `<a href="${parsed.url}" target="_blank" style="color: #008069; text-decoration: underline;">📎 ${parsed.name}</a>`;
+                    }
+                }
+            } catch (e) {}
+
+            if (!isFile) {
+                if (type === 'system') {
+                    contentDiv.innerHTML = text;
+                } else {
+                    contentDiv.textContent = text;
+                }
             }
         }
         
