@@ -194,7 +194,25 @@ if (parsed && parsed.__isFile) {
   }
 
 } else {
+  let parsed;
+
+try {
+  parsed = JSON.parse(msg.text);
+} catch {
+  parsed = null;
+}
+
+if (parsed && parsed.__isFile) {
+
+  if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+    addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, true, msg.created_at);
+  } else {
+    addMessage(null, type, `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, true, msg.created_at);
+  }
+
+} else {
   addMessage(msg.text, type, null, false, msg.created_at);
+}
 }
 }
             });
