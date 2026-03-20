@@ -101,13 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         let parsed;
 
                         try {
-                            parsed = JSON.parse(payload.new.text);
+                            parsed = typeof payload.new.text === 'string' ? JSON.parse(payload.new.text) : payload.new.text;
                         } catch {
                             parsed = null;
                         }
 
                         if (parsed && parsed.__isFile) {
-                            if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                            if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                                 addMessage(null, 'system', `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, payload.new.created_at);
                             } else {
                                 addMessage(null, 'system', `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, payload.new.created_at);
@@ -190,37 +190,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 let parsed;
 
                 try {
-                    parsed = JSON.parse(msg.text);
+                    parsed = typeof msg.text === 'string' ? JSON.parse(msg.text) : msg.text;
                 } catch {
                     parsed = null;
                 }
 
                 if (parsed && parsed.__isFile) {
-                    if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                    if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                         addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, msg.created_at);
                     } else {
                         addMessage(null, type, `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, msg.created_at);
                     }
                 } else {
-                    let parsed;
-
-try {
-  parsed = JSON.parse(msg.text);
-} catch {
-  parsed = null;
-}
-
-if (parsed && parsed.__isFile) {
-
-  if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-    addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, true, msg.created_at);
-  } else {
-    addMessage(null, type, `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, true, msg.created_at);
-  }
-
-} else {
-  addMessage(msg.text, type, null, false, msg.created_at);
-}
+                    addMessage(msg.text, type, null, false, msg.created_at);
                 }
             });
             
