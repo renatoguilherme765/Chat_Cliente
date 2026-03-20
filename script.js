@@ -110,7 +110,29 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                                 addMessage(null, 'system', `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, payload.new.created_at);
                             } else {
-                                addMessage(null, 'system', `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, payload.new.created_at);
+                                const fileHtml = `
+                                  <div style="
+                                    display:flex;
+                                    flex-direction:column;
+                                    align-items:center;
+                                    cursor:pointer;
+                                  " onclick="window.open('${parsed.url}', '_blank')">
+                                    <img 
+                                      src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                                      class="pdf-file-icon"
+                                      style="width:70px;height:70px;margin-bottom:4px;"
+                                    />
+                                    <div style="
+                                      font-size:12px;
+                                      color:#000;
+                                      text-align:center;
+                                      word-break:break-word;
+                                    ">
+                                      ${parsed.name}
+                                    </div>
+                                  </div>
+                                `;
+                                addMessage(null, 'system', fileHtml, false, payload.new.created_at);
                             }
                         } else {
                             addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
@@ -124,7 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função para adicionar mensagem ao chat
     function addMessage(text, type, htmlContent = null, save = true, createdAt = null) {
         const msgDiv = document.createElement('div');
-        msgDiv.classList.add('message');
+        if (!htmlContent || !htmlContent.includes('pdf-file-icon')) {
+            msgDiv.classList.add('message');
+        }
         msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
         
         const contentDiv = document.createElement('div');
@@ -199,7 +223,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                         addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, msg.created_at);
                     } else {
-                        addMessage(null, type, `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, msg.created_at);
+                        const fileHtml = `
+                          <div style="
+                            display:flex;
+                            flex-direction:column;
+                            align-items:center;
+                            cursor:pointer;
+                          " onclick="window.open('${parsed.url}', '_blank')">
+                            <img 
+                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                              class="pdf-file-icon"
+                              style="width:70px;height:70px;margin-bottom:4px;"
+                            />
+                            <div style="
+                              font-size:12px;
+                              color:#000;
+                              text-align:center;
+                              word-break:break-word;
+                            ">
+                              ${parsed.name}
+                            </div>
+                          </div>
+                        `;
+                        addMessage(null, type, fileHtml, false, msg.created_at);
                     }
                 } else {
                     addMessage(msg.text, type, null, false, msg.created_at);
