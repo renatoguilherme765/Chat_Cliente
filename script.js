@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatArea = document.getElementById('chatArea');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
+    const fileInput = document.getElementById('fileInput');
 
     let currentStep = 'start';
     let isLiveChat = false;
@@ -97,7 +98,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (payload.new.client_id === clientId && payload.new.sender === 'specialist') {
                     // Evita duplicar mensagens que o próprio sistema local enviou
                     if (!localMessages.has(payload.new.text)) {
-                        addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
+                        let parsed;
+
+                        try {
+                            parsed = JSON.parse(payload.new.text);
+                        } catch {
+                            parsed = null;
+                        }
+
+                        if (parsed && parsed.__isFile) {
+                            if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                                addMessage(null, 'system', `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, payload.new.created_at);
+                            } else {
+                                addMessage(null, 'system', `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, payload.new.created_at);
+                            }
+                        } else {
+                            addMessage(payload.new.text, 'system', null, false, payload.new.created_at);
+                        }
                     }
                 }
             })
@@ -116,21 +133,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (htmlContent) {
             contentDiv.innerHTML = htmlContent;
         } else if (text) {
-            let isFile = false;
-            try {
-                const parsed = JSON.parse(text);
-                if (parsed && parsed.__isFile) {
-                    isFile = true;
-                    const isImage = parsed.name.match(/\.(png|jpg|jpeg|gif)$/i);
-                    if (isImage) {
-                        contentDiv.innerHTML = `<img src="${parsed.url}" class="max-w-xs rounded-lg" />`;
-                    } else {
-                        contentDiv.innerHTML = `<a href="${parsed.url}" target="_blank" class="text-blue-600 underline">📎 ${parsed.name}</a>`;
-                    }
+            if (text.startsWith('http')) {
+                const isImage = text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                if (isImage) {
+                    contentDiv.innerHTML = `<img src="${text}" class="max-w-xs rounded-lg" />`;
+                } else {
+                    contentDiv.innerHTML = `<a href="${text}" target="_blank" class="text-blue-600 underline">Abrir arquivo</a>`;
                 }
-            } catch (e) {}
-
-            if (!isFile) {
+            } else {
                 if (type === 'system') {
                     contentDiv.innerHTML = text;
                 } else {
@@ -177,24 +187,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
-let parsed;
+                let parsed;
 
-try {
-  parsed = JSON.parse(msg.text);
-} catch {
-  parsed = null;
-}
+                try {
+                    parsed = JSON.parse(msg.text);
+                } catch {
+                    parsed = null;
+                }
 
-if (parsed && parsed.__isFile) {
-
-  if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-    addMessage(`<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, type, null, true, msg.created_at);
-  } else {
-    addMessage(`<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, type, null, true, msg.created_at);
-  }
-
-} else {
-  let parsed;
+                if (parsed && parsed.__isFile) {
+                    if (parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                        addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, msg.created_at);
+                    } else {
+                        addMessage(null, type, `<a href="${parsed.url}" target="_blank">📎 ${parsed.name}</a>`, false, msg.created_at);
+                    }
+                } else {
+                    let parsed;
 
 try {
   parsed = JSON.parse(msg.text);
@@ -213,8 +221,7 @@ if (parsed && parsed.__isFile) {
 } else {
   addMessage(msg.text, type, null, false, msg.created_at);
 }
-}
-}
+                }
             });
             
             // Verifica o status do cliente para saber se já está em atendimento
@@ -497,6 +504,42 @@ if (parsed && parsed.__isFile) {
                 }, 800);
             }
         }
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!window.supabaseClient) {
+                alert("Supabase não configurado.");
+                return;
+            }
+
+            const filePath = `${clientId}/${Date.now()}_${file.name}`;
+            
+            // Upload the file
+            const { error } = await window.supabaseClient.storage
+                .from('Chat_attachments')
+                .upload(filePath, file);
+
+            if (error) {
+                console.error('Erro no upload:', error);
+                alert('Erro ao enviar arquivo.');
+                return;
+            }
+
+            // Get public URL
+            const { data } = window.supabaseClient.storage
+                .from('Chat_attachments')
+                .getPublicUrl(filePath);
+
+            if (data && data.publicUrl) {
+                addMessage(data.publicUrl, 'user');
+            }
+            
+            fileInput.value = ''; // Reset input
+        });
     }
 
     sendBtn.addEventListener('click', handleSend);

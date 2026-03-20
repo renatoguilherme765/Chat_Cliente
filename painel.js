@@ -84,7 +84,16 @@ async function renderMessages() {
                 const div = document.createElement('div');
                 div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
                 
-                div.innerHTML = msg.text;
+                if (msg.text.startsWith('http')) {
+                    const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                    if (isImage) {
+                        div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
+                    } else {
+                        div.innerHTML = `<a href="${msg.text}" target="_blank" style="color: #008069; text-decoration: underline;">Abrir arquivo</a>`;
+                    }
+                } else {
+                    div.innerHTML = msg.text;
+                }
                 
                 chatMessages.appendChild(div);
             });
@@ -99,7 +108,16 @@ async function renderMessages() {
                 if (msg.htmlContent) {
                     div.innerHTML = msg.htmlContent;
                 } else {
-                    div.textContent = msg.text;
+                    if (msg.text.startsWith('http')) {
+                        const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                        if (isImage) {
+                            div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
+                        } else {
+                            div.innerHTML = `<a href="${msg.text}" target="_blank" style="color: #008069; text-decoration: underline;">Abrir arquivo</a>`;
+                        }
+                    } else {
+                        div.textContent = msg.text;
+                    }
                 }
                 chatMessages.appendChild(div);
             });
@@ -139,6 +157,51 @@ if (window.supabaseClient) {
         renderClients();
         renderMessages();
     }, 2000);
+}
+
+// Envio de arquivo pelo agente
+const agentFileInput = document.getElementById('agentFileInput');
+if (agentFileInput) {
+    agentFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || !activeClientId) return;
+
+        if (!window.supabaseClient) {
+            alert("Supabase não configurado.");
+            return;
+        }
+
+        const filePath = `${activeClientId}/${Date.now()}_${file.name}`;
+        
+        // Upload the file
+        const { error } = await window.supabaseClient.storage
+            .from('Chat_attachments')
+            .upload(filePath, file);
+
+        if (error) {
+            console.error('Erro no upload:', error);
+            alert('Erro ao enviar arquivo.');
+            return;
+        }
+
+        // Get public URL
+        const { data } = window.supabaseClient.storage
+            .from('Chat_attachments')
+            .getPublicUrl(filePath);
+
+        if (data && data.publicUrl) {
+            await window.supabaseClient.from('chat_messages').insert({
+                client_id: activeClientId,
+                sender: 'specialist',
+                text: data.publicUrl,
+                created_at: new Date()
+            });
+            await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
+            renderMessages();
+        }
+        
+        agentFileInput.value = ''; // Reset input
+    });
 }
 
 // Envio de mensagem pelo agente
