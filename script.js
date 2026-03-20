@@ -408,18 +408,18 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage("Ver condições", 'user');
             currentStep = 'cpf';
             setTimeout(() => {
-                addMessage("Por favor, informe seu CPF (apenas os 11 números) para consultarmos seu contrato.", 'system');
+                addMessage("Por favor, informe seu CPF ou CNPJ para consultarmos seu contrato.", 'system');
             }, 800);
         } else if (action === 'pagamento_total') {
             addMessage("1️⃣ Pagamento total da(s) parcela(s)", 'user');
             setTimeout(() => {
-                addMessage("Aguarde um instante, estamos analisando a melhor condição para pagamento total do seu contrato.", 'system');
+                addMessage("Aguarde um instante, estamos analisando a melhor condição para o seu contrato.", 'system');
                 setTimeout(() => {
                     const content = `
                         <div class="option-card">
                             <h4>Pagamento à Vista</h4>
                             <p>De: 20% de desconto</p>
-                            <p>Por: <span class="highlight">até 70% de desconto</span></p>
+                            <p>Por: <span class="highlight">até 80% de desconto</span></p>
                         </div>
                         <div class="btn-container">
                             <button class="chat-btn" onclick="handleAction('gerar_boleto')">Gerar boleto com desconto</button>
@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (action === 'renegociacao_carencia') {
             addMessage("2️⃣ Renegociação com carência de até 90 dias", 'user');
             setTimeout(() => {
-                addMessage("Estamos analisando a proposta de renegociação com carência. Aguarde um instante enquanto verificamos as condições disponíveis.", 'system');
+                addMessage("Estamos analisando a proposta de renegociação com carência de até 90 dias. Aguarde um instante enquanto verificamos as condições disponíveis.", 'system');
                 setTimeout(() => {
                     const content = `
                         <div class="option-card">
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (action === 'entrega_amigavel') {
             addMessage("3️⃣ Entrega amigável do bem", 'user');
             setTimeout(() => {
-                const msg = "A entrega amigável é quitativa, ou seja, realiza a liquidação total do financiamento.<br><br>Caso existam débitos no DETRAN, iremos regularizar e retirar essas pendências.<br><br>Após a conclusão, você poderá verificar a possibilidade de financiar outro veículo com parcelas que caibam no seu bolso.<br><br>Todas as informações estão sujeitas à análise.";
+                const msg = "A entrega amigável é quitativa, ou seja, quitação Total do financiamento.<br><br>Caso existam débitos no DETRAN, iremos regularizar e retirar essas pendências.<br><br>Após a conclusão, você poderá verificar a possibilidade de financiar outro veículo com parcelas que caibam no seu bolso.<br><br>Todas as informações estão sujeitas à análise.";
                 addMessage(null, 'system', msg);
                 setTimeout(() => {
                     const btn = `
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     addMessage(confirmMsg, 'system');
                     
                     setTimeout(() => {
-                        addMessage("Agora, por favor, digite seu primeiro nome.", 'system');
+                        addMessage("Agora, por favor, digite seu primeiro NOME.", 'system');
                         currentStep = currentStep === 'cpf_whatsapp' ? 'nome_whatsapp' : 'nome';
                     }, 800);
                 }, 800);
@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="btn-container">
                                     <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
                                     <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
-                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do bem</button>
+                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
                                     <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                                 </div>
                             `;
