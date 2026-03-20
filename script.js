@@ -1,4 +1,43 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Função para forçar o download de imagens
+    window.downloadImage = async function(url, filename) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename || 'download.jpg';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Erro ao baixar a imagem via fetch, tentando fallback:', error);
+            
+            // Fallback: Adiciona parâmetro download na URL
+            let finalUrl = url;
+            try {
+                const urlObj = new URL(url);
+                urlObj.searchParams.set('download', filename || 'true');
+                finalUrl = urlObj.toString();
+            } catch (e) {
+                // Ignore invalid URLs
+            }
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = finalUrl;
+            a.download = filename || 'download.jpg';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    };
+
     // Redirecionamento amigável
     if (window.location.pathname.replace(/\/$/, '') === '/negociar') {
         window.location.replace('/?origem=whatsapp');
@@ -108,7 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         if (parsed && parsed.__isFile) {
                             if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                                addMessage(null, 'system', `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, payload.new.created_at);
+                                const imgHtml = `
+                                    <div style="position: relative; display: inline-block;">
+                                        <img src="${parsed.url}" style="max-width:200px; border-radius:8px; display: block;" />
+                                        <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${parsed.url}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                `;
+                                addMessage(null, 'system', imgHtml, false, payload.new.created_at);
                             } else {
                                 const fileHtml = `
                                   <div style="
@@ -119,14 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                   " onclick="window.open('${parsed.url}', '_blank')">
                                     <img 
                                       src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                                      class="pdf-file-icon"
-                                      style="width:70px;height:70px;margin-bottom:4px;"
+                                      class="pdf-clean"
+                                      style="
+                                        width:80px;
+                                        height:80px;
+                                      "
                                     />
                                     <div style="
                                       font-size:12px;
+                                      margin-top:4px;
                                       color:#000;
                                       text-align:center;
-                                      word-break:break-word;
                                     ">
                                       ${parsed.name}
                                     </div>
@@ -146,10 +199,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função para adicionar mensagem ao chat
     function addMessage(text, type, htmlContent = null, save = true, createdAt = null) {
         const msgDiv = document.createElement('div');
-        if (!htmlContent || !htmlContent.includes('pdf-file-icon')) {
+        if (!htmlContent || !htmlContent.includes('pdf-clean')) {
             msgDiv.classList.add('message');
+            msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
+        } else {
+            msgDiv.style.alignSelf = type === 'system' ? 'flex-start' : 'flex-end';
+            msgDiv.style.animation = 'fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            msgDiv.style.margin = '4px 0';
         }
-        msgDiv.classList.add(type === 'system' ? 'system-msg' : 'user-msg');
         
         const contentDiv = document.createElement('div');
         contentDiv.classList.add('message-text');
@@ -160,7 +217,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (text.startsWith('http')) {
                 const isImage = text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                 if (isImage) {
-                    contentDiv.innerHTML = `<img src="${text}" class="max-w-xs rounded-lg" />`;
+                    contentDiv.innerHTML = `
+                        <div style="position: relative; display: inline-block;">
+                            <img src="${text}" class="max-w-xs rounded-lg" style="display: block;" />
+                            <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${text}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                  <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                </svg>
+                            </a>
+                        </div>
+                    `;
                 } else {
                     contentDiv.innerHTML = `<a href="${text}" target="_blank" class="text-blue-600 underline">Abrir arquivo</a>`;
                 }
@@ -221,7 +288,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (parsed && parsed.__isFile) {
                     if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                        addMessage(null, type, `<img src="${parsed.url}" style="max-width:200px;border-radius:8px;">`, false, msg.created_at);
+                        const imgHtml = `
+                            <div style="position: relative; display: inline-block;">
+                                <img src="${parsed.url}" style="max-width:200px; border-radius:8px; display: block;" />
+                                <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${parsed.url}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                    </svg>
+                                </a>
+                            </div>
+                        `;
+                        addMessage(null, type, imgHtml, false, msg.created_at);
                     } else {
                         const fileHtml = `
                           <div style="
@@ -232,14 +310,17 @@ document.addEventListener('DOMContentLoaded', () => {
                           " onclick="window.open('${parsed.url}', '_blank')">
                             <img 
                               src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                              class="pdf-file-icon"
-                              style="width:70px;height:70px;margin-bottom:4px;"
+                              class="pdf-clean"
+                              style="
+                                width:80px;
+                                height:80px;
+                              "
                             />
                             <div style="
                               font-size:12px;
+                              margin-top:4px;
                               color:#000;
                               text-align:center;
-                              word-break:break-word;
                             ">
                               ${parsed.name}
                             </div>
