@@ -148,8 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (parsed && parsed.__isFile) {
                             if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                                 const imgHtml = `
-                                    <div style="position: relative; display: inline-block;">
-                                        <img src="${parsed.url}" style="max-width:200px; border-radius:8px; display: block;" />
+                                    <div style="position: relative; display: inline-block; max-width: 100%;">
+                                        <img src="${parsed.url}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
                                         <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${parsed.url}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                               <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
@@ -218,8 +218,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isImage = text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                 if (isImage) {
                     contentDiv.innerHTML = `
-                        <div style="position: relative; display: inline-block;">
-                            <img src="${text}" class="max-w-xs rounded-lg" style="display: block;" />
+                        <div style="position: relative; display: inline-block; max-width: 100%;">
+                            <img src="${text}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
                             <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${text}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                   <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
@@ -289,8 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (parsed && parsed.__isFile) {
                     if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
                         const imgHtml = `
-                            <div style="position: relative; display: inline-block;">
-                                <img src="${parsed.url}" style="max-width:200px; border-radius:8px; display: block;" />
+                            <div style="position: relative; display: inline-block; max-width: 100%;">
+                                <img src="${parsed.url}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
                                 <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${parsed.url}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                       <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
