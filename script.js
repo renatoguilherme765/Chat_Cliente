@@ -38,6 +38,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Função para forçar o download de PDFs
+    window.downloadPdf = function(url, filename) {
+        fetch(url)
+            .then(res => res.blob())
+            .then(blob => {
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename || 'arquivo.pdf';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(err => {
+                console.error('Erro ao baixar PDF:', err);
+                window.open(url, '_blank');
+            });
+    };
+
     // Redirecionamento amigável
     if (window.location.pathname.replace(/\/$/, '') === '/negociar') {
         window.location.replace('/?origem=whatsapp');
@@ -182,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     ">
                                       ${parsed.name}
                                     </div>
-                                    <a href="${parsed.url}" download style="
+                                    <a href="#" onclick="event.preventDefault(); window.downloadPdf('${parsed.url}', '${parsed.name}');" style="
                                       margin-top:6px;
                                       font-size:12px;
                                       color:#2563eb;
@@ -256,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ">
                           ${fileName}
                         </div>
-                        <a href="${text}" download style="
+                        <a href="#" onclick="event.preventDefault(); window.downloadPdf('${text}', '${fileName}');" style="
                           margin-top:6px;
                           font-size:12px;
                           color:#2563eb;
@@ -357,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ">
                               ${parsed.name}
                             </div>
-                            <a href="${parsed.url}" download style="
+                            <a href="#" onclick="event.preventDefault(); window.downloadPdf('${parsed.url}', '${parsed.name}');" style="
                               margin-top:6px;
                               font-size:12px;
                               color:#2563eb;
