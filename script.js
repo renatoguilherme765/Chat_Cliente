@@ -312,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
             messages.forEach(msg => {
                 // Não mostra a mensagem oculta de solicitação de boleto para o cliente
                 if (msg.text === "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.") return;
+                if (msg.text === "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.") return;
                 
                 const type = msg.sender === 'client' ? 'user' : 'system';
                 // Adiciona a mensagem sem salvar novamente no banco
@@ -502,17 +503,22 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage("2️⃣ Renegociação com carência de até 90 dias", 'user');
             setTimeout(() => {
                 addMessage("Estamos analisando a proposta de renegociação com carência de até 90 dias. Aguarde um instante enquanto verificamos as condições disponíveis.", 'system');
-                setTimeout(() => {
-                    const content = `
-                        <div class="option-card">
-                            <h4>Parcelamento</h4>
-                            <p><span class="highlight">5x de R$ 1.000,00</span></p>
-                        </div>
-                        <div class="btn-container">
-                            <button class="chat-btn" onclick="handleAction('falar_especialista')">Falar com especialista</button>
-                        </div>
-                    `;
-                    addMessage(null, 'system', content);
+                setTimeout(async () => {
+                    addMessage("Aguarde um instante, você será redirecionado para um especialista.", 'system');
+                    isLiveChat = true;
+                    
+                    if (window.supabaseClient) {
+                        await createClientIfNotExists();
+                        await window.supabaseClient.from('chat_messages').insert([
+                            {
+                                client_id: clientId,
+                                text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                                sender: 'client',
+                                created_at: new Date()
+                            }
+                        ]);
+                        await window.supabaseClient.from('chat_clients').update({ status: 'aguardando' }).eq('id', clientId);
+                    }
                 }, 1500);
             }, 800);
         } else if (action === 'entrega_amigavel') {
