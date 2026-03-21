@@ -58,12 +58,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const telefoneCliente = urlParams.get("tel") || urlParams.get("telefone") || '';
     const origem = urlParams.get("origem");
     
-    // 1. Gerar novo client_id a cada carregamento
-    let clientId = crypto.randomUUID();
+    // 1. Recuperar client_id do localStorage ou gerar um novo
+    let clientId = localStorage.getItem("chat_client_id");
     let isReturningClient = false;
     
-    // Remover qualquer client_id salvo anteriormente para garantir o reset
-    localStorage.removeItem("chat_client_id");
+    if (clientId) {
+        isReturningClient = true;
+    } else {
+        clientId = crypto.randomUUID();
+        localStorage.setItem("chat_client_id", clientId);
+    }
 
     const localMessages = new Set();
     let clientEnsured = false;
@@ -380,6 +384,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clientData && (clientData.status === 'em_atendimento' || clientData.status === 'aguardando')) {
                 isLiveChat = true;
                 currentStep = 'done';
+            } else {
+                // Restaurar o currentStep baseado no histórico
+                const isNegociarRoute = window.location.pathname.replace(/\/$/, '') === '/negociar';
+                const isWhatsappOrigin = origem === 'whatsapp';
+                
+                const reversedMessages = [...messages].reverse();
+                for (const msg of reversedMessages) {
+                    if (msg.sender === 'specialist' || msg.sender === 'system') {
+                        const text = msg.text || '';
+                        if (text.includes("Gerando boleto") || text.includes("conectado a um especialista")) {
+                            isLiveChat = true;
+                            currentStep = 'done';
+                            break;
+                        } else if (text.includes("informe seu CPF") || text.includes("digite seu CPF") || text.includes("CPF/CNPJ inválido") || text.includes("CPF inválido")) {
+                            currentStep = (isWhatsappOrigin || isNegociarRoute) ? 'cpf_whatsapp' : 'cpf';
+                            break;
+                        } else if (text.includes("digite seu primeiro NOME") || text.includes("nome válido")) {
+                            currentStep = (isWhatsappOrigin || isNegociarRoute) ? 'nome_whatsapp' : 'nome';
+                            break;
+                        } else if (text.includes("Opções disponíveis") || text.includes("Pagamento à Vista") || text.includes("Parcelamento") || text.includes("Entrega amigável") || text.includes("escolha uma das opções")) {
+                            currentStep = 'nome_recebido';
+                            break;
+                        } else if (text.includes("Zere sua dívida hoje!")) {
+                            currentStep = 'start';
+                            break;
+                        }
+                    }
+                }
             }
             return true;
         }
