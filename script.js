@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 addMessage("Estamos analisando a proposta de renegociação com carência de até 90 dias. Aguarde um instante enquanto verificamos as condições disponíveis.", 'system');
                 setTimeout(async () => {
-                    addMessage("Aguarde um instante, você será redirecionado para um especialista.", 'system');
+                    addMessage("Você será redirecionado para um especialista.", 'system');
                     isLiveChat = true;
                     
                     if (window.supabaseClient) {
