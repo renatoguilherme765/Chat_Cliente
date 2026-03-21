@@ -165,24 +165,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                     display:flex;
                                     flex-direction:column;
                                     align-items:center;
-                                    cursor:pointer;
-                                  " onclick="window.open('${parsed.url}', '_blank')">
+                                  ">
                                     <img 
                                       src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                                       class="pdf-clean"
-                                      style="
-                                        width:80px;
-                                        height:80px;
-                                      "
+                                      style="width:70px;height:70px;"
                                     />
                                     <div style="
                                       font-size:12px;
                                       margin-top:4px;
-                                      color:#000;
                                       text-align:center;
                                     ">
                                       ${parsed.name}
                                     </div>
+                                    <a href="${parsed.url}" download style="
+                                      margin-top:6px;
+                                      font-size:12px;
+                                      color:#2563eb;
+                                      text-decoration:none;
+                                      font-weight:500;
+                                    ">
+                                      ⬇️ Baixar PDF
+                                    </a>
                                   </div>
                                 `;
                                 addMessage(null, 'system', fileHtml, false, payload.new.created_at);
@@ -229,7 +233,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     `;
                 } else {
-                    contentDiv.innerHTML = `<a href="${text}" target="_blank" class="text-blue-600 underline">Abrir arquivo</a>`;
+                    const fileName = text.split('/').pop() || 'Documento';
+                    contentDiv.innerHTML = `
+                      <div style="
+                        display:flex;
+                        flex-direction:column;
+                        align-items:center;
+                      ">
+                        <img 
+                          src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                          style="width:70px;height:70px;"
+                        />
+                        <div style="
+                          font-size:12px;
+                          margin-top:4px;
+                          text-align:center;
+                          word-break: break-all;
+                        ">
+                          ${fileName}
+                        </div>
+                        <a href="${text}" download style="
+                          margin-top:6px;
+                          font-size:12px;
+                          color:#2563eb;
+                          text-decoration:none;
+                          font-weight:500;
+                        ">
+                          ⬇️ Baixar PDF
+                        </a>
+                      </div>
+                    `;
                 }
             } else {
                 if (type === 'system') {
@@ -306,24 +339,28 @@ document.addEventListener('DOMContentLoaded', () => {
                             display:flex;
                             flex-direction:column;
                             align-items:center;
-                            cursor:pointer;
-                          " onclick="window.open('${parsed.url}', '_blank')">
+                          ">
                             <img 
                               src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
                               class="pdf-clean"
-                              style="
-                                width:80px;
-                                height:80px;
-                              "
+                              style="width:70px;height:70px;"
                             />
                             <div style="
                               font-size:12px;
                               margin-top:4px;
-                              color:#000;
                               text-align:center;
                             ">
                               ${parsed.name}
                             </div>
+                            <a href="${parsed.url}" download style="
+                              margin-top:6px;
+                              font-size:12px;
+                              color:#2563eb;
+                              text-decoration:none;
+                              font-weight:500;
+                            ">
+                              ⬇️ Baixar PDF
+                            </a>
                           </div>
                         `;
                         addMessage(null, type, fileHtml, false, msg.created_at);

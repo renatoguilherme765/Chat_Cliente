@@ -84,12 +84,79 @@ async function renderMessages() {
                 const div = document.createElement('div');
                 div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
                 
-                if (msg.text.startsWith('http')) {
+                let parsed = null;
+                try {
+                    parsed = JSON.parse(msg.text);
+                } catch (e) {}
+
+                if (parsed && parsed.__isFile) {
+                    if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                        div.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                    } else {
+                        div.innerHTML = `
+                          <div style="
+                            display:flex;
+                            flex-direction:column;
+                            align-items:center;
+                          ">
+                            <img 
+                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                              style="width:70px;height:70px;"
+                            />
+                            <div style="
+                              font-size:12px;
+                              margin-top:4px;
+                              text-align:center;
+                            ">
+                              ${parsed.name}
+                            </div>
+                            <a href="${parsed.url}" download style="
+                              margin-top:6px;
+                              font-size:12px;
+                              color:#2563eb;
+                              text-decoration:none;
+                              font-weight:500;
+                            ">
+                              ⬇️ Baixar PDF
+                            </a>
+                          </div>
+                        `;
+                    }
+                } else if (msg.text.startsWith('http')) {
                     const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                     if (isImage) {
                         div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
                     } else {
-                        div.innerHTML = `<a href="${msg.text}" target="_blank" style="color: #008069; text-decoration: underline;">Abrir arquivo</a>`;
+                        const fileName = msg.text.split('/').pop() || 'Documento';
+                        div.innerHTML = `
+                          <div style="
+                            display:flex;
+                            flex-direction:column;
+                            align-items:center;
+                          ">
+                            <img 
+                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                              style="width:70px;height:70px;"
+                            />
+                            <div style="
+                              font-size:12px;
+                              margin-top:4px;
+                              text-align:center;
+                              word-break: break-all;
+                            ">
+                              ${fileName}
+                            </div>
+                            <a href="${msg.text}" download style="
+                              margin-top:6px;
+                              font-size:12px;
+                              color:#2563eb;
+                              text-decoration:none;
+                              font-weight:500;
+                            ">
+                              ⬇️ Baixar PDF
+                            </a>
+                          </div>
+                        `;
                     }
                 } else {
                     div.innerHTML = msg.text;
@@ -105,15 +172,83 @@ async function renderMessages() {
             chat.messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `message ${msg.type === 'user' ? 'client-msg' : 'agent-msg'}`;
+                
+                let parsed = null;
+                try {
+                    parsed = JSON.parse(msg.text);
+                } catch (e) {}
+
                 if (msg.htmlContent) {
                     div.innerHTML = msg.htmlContent;
+                } else if (parsed && parsed.__isFile) {
+                    if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                        div.innerHTML = `<img src="${parsed.url}" style="max-width: 100%; border-radius: 8px;" />`;
+                    } else {
+                        div.innerHTML = `
+                          <div style="
+                            display:flex;
+                            flex-direction:column;
+                            align-items:center;
+                          ">
+                            <img 
+                              src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                              style="width:70px;height:70px;"
+                            />
+                            <div style="
+                              font-size:12px;
+                              margin-top:4px;
+                              text-align:center;
+                            ">
+                              ${parsed.name}
+                            </div>
+                            <a href="${parsed.url}" download style="
+                              margin-top:6px;
+                              font-size:12px;
+                              color:#2563eb;
+                              text-decoration:none;
+                              font-weight:500;
+                            ">
+                              ⬇️ Baixar PDF
+                            </a>
+                          </div>
+                        `;
+                    }
                 } else {
                     if (msg.text.startsWith('http')) {
                         const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                         if (isImage) {
                             div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
                         } else {
-                            div.innerHTML = `<a href="${msg.text}" target="_blank" style="color: #008069; text-decoration: underline;">Abrir arquivo</a>`;
+                            const fileName = msg.text.split('/').pop() || 'Documento';
+                            div.innerHTML = `
+                              <div style="
+                                display:flex;
+                                flex-direction:column;
+                                align-items:center;
+                              ">
+                                <img 
+                                  src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
+                                  style="width:70px;height:70px;"
+                                />
+                                <div style="
+                                  font-size:12px;
+                                  margin-top:4px;
+                                  text-align:center;
+                                  word-break: break-all;
+                                ">
+                                  ${fileName}
+                                </div>
+                                <a href="${msg.text}" download style="
+                                  margin-top:6px;
+                                  font-size:12px;
+                                  color:#2563eb;
+                                  text-decoration:none;
+                                  font-weight:500;
+                                ">
+                                  ⬇️ Baixar PDF
+                                </a>
+                              </div>
+                            `;
                         }
                     } else {
                         div.textContent = msg.text;
