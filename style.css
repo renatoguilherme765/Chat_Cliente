@@ -8,15 +8,21 @@
 
 body, html {
     height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
     background-color: #d9dbd5; /* Fundo neutro externo */
     overflow: hidden;
+    position: fixed; /* Prevents bouncing/scrolling on iOS */
+    top: 0;
+    left: 0;
 }
 
 /* Container Principal */
 .app-container {
     display: flex;
     flex-direction: column;
-    height: 100dvh; /* Usa dvh para mobile */
+    height: 100%; /* Usa 100% já que o body é fixed */
     width: 100%;
     max-width: 500px; /* Limite para parecer app no desktop */
     margin: 0 auto;
@@ -382,7 +388,7 @@ body, html {
     .app-container {
         width: 100%;
         max-width: none;
-        height: 100dvh;
+        height: 100%;
     }
 }
 
@@ -394,7 +400,7 @@ body, html {
 
     .app-container {
         max-width: 100%;
-        height: 100dvh;
+        height: 100%;
     }
 
     .chat-area {
