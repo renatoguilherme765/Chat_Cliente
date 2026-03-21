@@ -38,24 +38,96 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Função para forçar o download de PDFs
-    window.downloadPdf = function(url, filename) {
-        fetch(url)
-            .then(res => res.blob())
-            .then(blob => {
-                const blobUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = blobUrl;
-                a.download = filename || 'arquivo.pdf';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            })
-            .catch(err => {
-                console.error('Erro ao baixar PDF:', err);
-                window.open(url, '_blank');
-            });
+    // Função para forçar o download de PDFs com validação de segurança
+    window.downloadPdf = async function(url, filename) {
+        try {
+            // 1. Solicitar os 4 primeiros dígitos
+            const input = prompt("Por segurança, digite os 4 primeiros números do seu CPF ou CNPJ:");
+            
+            if (!input) {
+                return; // Usuário cancelou
+            }
+            
+            const digits = input.replace(/\D/g, '').substring(0, 4);
+            
+            if (digits.length !== 4) {
+                alert("Dados incorretos");
+                return;
+            }
+            
+            // 2. Buscar o CPF/CNPJ do cliente no banco
+            let storedDoc = null;
+            
+            if (window.supabaseClient) {
+                // Tenta buscar da tabela chat_clients (pode ser cpf ou documento)
+                const { data, error } = await window.supabaseClient
+                    .from('chat_clients')
+                    .select('cpf, documento')
+                    .eq('id', clientId)
+                    .single();
+                    
+                if (data && !error) {
+                    storedDoc = data.cpf || data.documento;
+                }
+                
+                // Se não encontrou na tabela, tenta buscar nas mensagens do cliente
+                if (!storedDoc) {
+                    const { data: msgs } = await window.supabaseClient
+                        .from('chat_messages')
+                        .select('text')
+                        .eq('client_id', clientId)
+                        .eq('sender', 'client')
+                        .order('created_at', { ascending: true });
+                        
+                    if (msgs && msgs.length > 0) {
+                        // Procura a primeira mensagem que parece um CPF/CNPJ (apenas números, length >= 11)
+                        for (const msg of msgs) {
+                            const cleanText = msg.text.replace(/\D/g, '');
+                            if (cleanText.length >= 11 && cleanText.length <= 14) {
+                                storedDoc = cleanText;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!storedDoc) {
+                alert("Não foi possível validar seus dados no momento.");
+                return;
+            }
+            
+            const cleanStoredDoc = storedDoc.replace(/\D/g, '');
+            const storedDigits = cleanStoredDoc.substring(0, 4);
+            
+            // 3. Validar
+            if (digits !== storedDigits) {
+                alert("Dados incorretos");
+                return;
+            }
+            
+            // 4. Se passou, faz o download
+            fetch(url)
+                .then(res => res.blob())
+                .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = blobUrl;
+                    a.download = filename || 'arquivo.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                })
+                .catch(err => {
+                    console.error('Erro ao baixar PDF:', err);
+                    window.open(url, '_blank');
+                });
+                
+        } catch (error) {
+            console.error("Erro na validação de segurança do PDF:", error);
+            alert("Ocorreu um erro ao tentar baixar o arquivo.");
+        }
     };
 
     // Redirecionamento amigável
