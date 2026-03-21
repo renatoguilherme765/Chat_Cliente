@@ -257,32 +257,44 @@ document.addEventListener('DOMContentLoaded', () => {
                                 addMessage(null, 'system', imgHtml, false, payload.new.created_at);
                             } else {
                                 const fileHtml = `
-                                  <div style="
-                                    display:flex;
-                                    flex-direction:column;
-                                    align-items:center;
+                                  <div 
+                                    onclick="window.downloadPdf('${parsed.url}', '${parsed.name}')"
+                                    style="
+                                      background: #ffffff;
+                                      border-radius: 12px;
+                                      padding: 16px;
+                                      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                                      display: flex;
+                                      flex-direction: column;
+                                      align-items: center;
+                                      gap: 12px;
+                                      cursor: pointer;
+                                      margin: 4px 0;
+                                      min-width: 180px;
+                                      max-width: 240px;
+                                      border: 1px solid #f0f0f0;
                                   ">
                                     <img 
                                       src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                                      class="pdf-clean"
-                                      style="width:70px;height:70px;"
+                                      style="width: 64px; height: 64px;"
                                     />
                                     <div style="
-                                      font-size:12px;
-                                      margin-top:4px;
-                                      text-align:center;
+                                      font-size: 15px;
+                                      font-weight: 600;
+                                      color: #1f2937;
+                                      text-align: center;
+                                      word-break: break-word;
+                                      line-height: 1.3;
                                     ">
                                       ${parsed.name}
                                     </div>
-                                    <a href="#" onclick="event.preventDefault(); window.downloadPdf('${parsed.url}', '${parsed.name}');" style="
-                                      margin-top:6px;
-                                      font-size:12px;
-                                      color:#2563eb;
-                                      text-decoration:none;
-                                      font-weight:500;
+                                    <div style="
+                                      font-size: 13px;
+                                      color: #6b7280;
+                                      font-weight: 500;
                                     ">
-                                      ⬇️ Baixar PDF
-                                    </a>
+                                      Toque para baixar
+                                    </div>
                                   </div>
                                 `;
                                 addMessage(null, 'system', fileHtml, false, payload.new.created_at);
@@ -331,32 +343,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const fileName = text.split('/').pop() || 'Documento';
                     contentDiv.innerHTML = `
-                      <div style="
-                        display:flex;
-                        flex-direction:column;
-                        align-items:center;
+                      <div 
+                        onclick="window.downloadPdf('${text}', '${fileName}')"
+                        style="
+                          background: #ffffff;
+                          border-radius: 12px;
+                          padding: 16px;
+                          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                          display: flex;
+                          flex-direction: column;
+                          align-items: center;
+                          gap: 12px;
+                          cursor: pointer;
+                          margin: 4px 0;
+                          min-width: 180px;
+                          max-width: 240px;
+                          border: 1px solid #f0f0f0;
                       ">
                         <img 
                           src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                          style="width:70px;height:70px;"
+                          style="width: 64px; height: 64px;"
                         />
                         <div style="
-                          font-size:12px;
-                          margin-top:4px;
-                          text-align:center;
-                          word-break: break-all;
+                          font-size: 15px;
+                          font-weight: 600;
+                          color: #1f2937;
+                          text-align: center;
+                          word-break: break-word;
+                          line-height: 1.3;
                         ">
                           ${fileName}
                         </div>
-                        <a href="#" onclick="event.preventDefault(); window.downloadPdf('${text}', '${fileName}');" style="
-                          margin-top:6px;
-                          font-size:12px;
-                          color:#2563eb;
-                          text-decoration:none;
-                          font-weight:500;
+                        <div style="
+                          font-size: 13px;
+                          color: #6b7280;
+                          font-weight: 500;
                         ">
-                          ⬇️ Baixar PDF
-                        </a>
+                          Toque para baixar
+                        </div>
                       </div>
                     `;
                 }
@@ -432,32 +456,44 @@ document.addEventListener('DOMContentLoaded', () => {
                         addMessage(null, type, imgHtml, false, msg.created_at);
                     } else {
                         const fileHtml = `
-                          <div style="
-                            display:flex;
-                            flex-direction:column;
-                            align-items:center;
+                          <div 
+                            onclick="window.downloadPdf('${parsed.url}', '${parsed.name}')"
+                            style="
+                              background: #ffffff;
+                              border-radius: 12px;
+                              padding: 16px;
+                              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              gap: 12px;
+                              cursor: pointer;
+                              margin: 4px 0;
+                              min-width: 180px;
+                              max-width: 240px;
+                              border: 1px solid #f0f0f0;
                           ">
                             <img 
                               src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg"
-                              class="pdf-clean"
-                              style="width:70px;height:70px;"
+                              style="width: 64px; height: 64px;"
                             />
                             <div style="
-                              font-size:12px;
-                              margin-top:4px;
-                              text-align:center;
+                              font-size: 15px;
+                              font-weight: 600;
+                              color: #1f2937;
+                              text-align: center;
+                              word-break: break-word;
+                              line-height: 1.3;
                             ">
                               ${parsed.name}
                             </div>
-                            <a href="#" onclick="event.preventDefault(); window.downloadPdf('${parsed.url}', '${parsed.name}');" style="
-                              margin-top:6px;
-                              font-size:12px;
-                              color:#2563eb;
-                              text-decoration:none;
-                              font-weight:500;
+                            <div style="
+                              font-size: 13px;
+                              color: #6b7280;
+                              font-weight: 500;
                             ">
-                              ⬇️ Baixar PDF
-                            </a>
+                              Toque para baixar
+                            </div>
                           </div>
                         `;
                         addMessage(null, type, fileHtml, false, msg.created_at);
