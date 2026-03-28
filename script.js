@@ -140,6 +140,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
   let tenantId = null;
 
+  // Função para formatar o nome da empresa (Primeira letra maiúscula)
+  const formatCompanyName = (slug) => {
+    if (!slug) return "Atendimento Digital";
+    return slug.charAt(0).toUpperCase() + slug.slice(1).toLowerCase();
+  };
+
+  // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
+  const headerTitle = document.querySelector(".header-title h1");
+  if (headerTitle && slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
+    headerTitle.textContent = formatCompanyName(slug_da_url);
+  }
+
   console.log("Slug capturado da URL:", slug_da_url);
 
   if (!slug_da_url || slug_da_url.toLowerCase() === 'index.html') {
@@ -178,12 +190,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       tenantId = tenantData.id;
       localStorage.setItem("tenant_id", tenantId);
-
-      // Atualizar o nome da empresa no cabeçalho com o nome recuperado
-      const headerTitle = document.querySelector(".header-title h1");
-      if (headerTitle) {
-        headerTitle.textContent = tenantData.nome || 'Atendimento Digital';
-      }
     }
   }
 
