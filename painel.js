@@ -82,11 +82,11 @@ async function renderMessages() {
         if (messages) {
             messages.forEach(msg => {
                 const div = document.createElement('div');
-                div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
+                div.className = `message ${msg.sender_type === 'client' ? 'client-msg' : 'agent-msg'}`;
                 
                 let parsed = null;
                 try {
-                    parsed = JSON.parse(msg.text);
+                    parsed = JSON.parse(msg.content);
                 } catch (e) {}
 
                 if (parsed && parsed.__isFile) {
@@ -122,12 +122,12 @@ async function renderMessages() {
                           </div>
                         `;
                     }
-                } else if (msg.text.startsWith('http')) {
-                    const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                } else if (msg.content.startsWith('http')) {
+                    const isImage = msg.content.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                     if (isImage) {
-                        div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
+                        div.innerHTML = `<img src="${msg.content}" style="max-width: 100%; border-radius: 8px;" />`;
                     } else {
-                        const fileName = msg.text.split('/').pop() || 'Documento';
+                        const fileName = msg.content.split('/').pop() || 'Documento';
                         div.innerHTML = `
                           <div style="
                             display:flex;
@@ -146,7 +146,7 @@ async function renderMessages() {
                             ">
                               ${fileName}
                             </div>
-                            <a href="${msg.text}" download style="
+                            <a href="${msg.content}" download style="
                               margin-top:6px;
                               font-size:12px;
                               color:#2563eb;
@@ -159,7 +159,7 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    div.innerHTML = msg.text;
+                    div.innerHTML = msg.content;
                 }
                 
                 chatMessages.appendChild(div);
@@ -175,7 +175,7 @@ async function renderMessages() {
                 
                 let parsed = null;
                 try {
-                    parsed = JSON.parse(msg.text);
+                    parsed = JSON.parse(msg.content);
                 } catch (e) {}
 
                 if (msg.htmlContent) {
@@ -214,12 +214,12 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    if (msg.text.startsWith('http')) {
-                        const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                    if (msg.content.startsWith('http')) {
+                        const isImage = msg.content.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                         if (isImage) {
-                            div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
+                            div.innerHTML = `<img src="${msg.content}" style="max-width: 100%; border-radius: 8px;" />`;
                         } else {
-                            const fileName = msg.text.split('/').pop() || 'Documento';
+                            const fileName = msg.content.split('/').pop() || 'Documento';
                             div.innerHTML = `
                               <div style="
                                 display:flex;
@@ -238,7 +238,7 @@ async function renderMessages() {
                                 ">
                                   ${fileName}
                                 </div>
-                                <a href="${msg.text}" download style="
+                                <a href="${msg.content}" download style="
                                   margin-top:6px;
                                   font-size:12px;
                                   color:#2563eb;
@@ -251,7 +251,7 @@ async function renderMessages() {
                             `;
                         }
                     } else {
-                        div.textContent = msg.text;
+                        div.textContent = msg.content;
                     }
                 }
                 chatMessages.appendChild(div);
@@ -327,8 +327,8 @@ if (agentFileInput) {
         if (data && data.publicUrl) {
             await window.supabaseClient.from('chat_messages').insert({
                 client_id: activeClientId,
-                sender: 'specialist',
-                text: data.publicUrl,
+                sender_type: 'specialist',
+                content: data.publicUrl,
                 created_at: new Date()
             });
             await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
@@ -348,8 +348,8 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (window.supabaseClient) {
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
-            sender: 'specialist',
-            text: text,
+            sender_type: 'specialist',
+            content: text,
             created_at: new Date()
         });
         await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
@@ -357,7 +357,7 @@ document.getElementById('agentSendBtn').onclick = async () => {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
         if (chats[activeClientId]) {
             chats[activeClientId].messages.push({
-                text: text,
+                content: text,
                 type: 'specialist',
                 htmlContent: null
             });
