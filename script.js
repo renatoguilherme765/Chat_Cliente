@@ -140,10 +140,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
   let tenantId = null;
 
-  // Função para formatar o nome da empresa (Primeira letra maiúscula)
+  // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
     if (!slug) return "Atendimento Digital";
-    return slug.charAt(0).toUpperCase() + slug.slice(1).toLowerCase();
+    return slug
+      .split(/[-_]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
