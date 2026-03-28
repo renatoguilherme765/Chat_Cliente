@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             .select("content")
             .eq("client_id", clientId)
             .eq("tenant_id", tenantId)
-            .eq("sender_type", "client")
+            .eq("sender_type", "cliente")
             .order("created_at", { ascending: true });
 
           if (msgs && msgs.length > 0) {
@@ -268,7 +268,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!window.supabaseClient) return;
     await createClientIfNotExists();
 
-    let sender = type === "user" ? "client" : "specialist";
+    // Busca o especialista_id atual do cliente
+    let especialista_id = null;
+    try {
+      const { data: clientData } = await window.supabaseClient
+        .from("chat_clients")
+        .select("especialista_id")
+        .eq("id", clientId)
+        .single();
+      if (clientData) especialista_id = clientData.especialista_id;
+    } catch (e) {
+      console.warn("Não foi possível buscar especialista_id:", e);
+    }
+
+    let sender = type === "user" ? "cliente" : "especialista";
     let messageText = text || htmlContent;
 
     localMessages.add(messageText);
@@ -277,6 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
+          especialista_id: especialista_id,
           content: messageText,
           sender_type: sender,
           created_at: new Date(),
@@ -308,7 +322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender_type === "specialist") {
+          if (payload.new.sender_type === "especialista") {
             // Evita duplicar mensagens que o próprio sistema local enviou
             if (!localMessages.has(payload.new.content)) {
               let parsed;
@@ -570,7 +584,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         )
           return;
 
-        const type = msg.sender_type === "client" ? "user" : "system";
+        const type = msg.sender_type === "cliente" ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
         let parsed;
 
@@ -667,7 +681,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const reversedMessages = [...messages].reverse();
         for (const msg of reversedMessages) {
-          if (msg.sender_type === "specialist" || msg.sender_type === "system") {
+          if (msg.sender_type === "especialista" || msg.sender_type === "system") {
             const text = msg.content || "";
             if (
               text.includes("Gerando boleto") ||
@@ -820,8 +834,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             await window.supabaseClient.from("chat_messages").insert([
               {
                 client_id: clientId,
+                especialista_id: null,
                 content: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                sender_type: "client",
+                sender_type: "cliente",
                 created_at: new Date(),
                 tenant_id: tenantId,
               },
@@ -898,8 +913,9 @@ document.addEventListener("DOMContentLoaded", async () => {
               await window.supabaseClient.from("chat_messages").insert([
                 {
                   client_id: clientId,
+                  especialista_id: null,
                   content: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
-                  sender_type: "client",
+                  sender_type: "cliente",
                   created_at: new Date(),
                   tenant_id: tenantId,
                 },

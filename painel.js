@@ -1,4 +1,5 @@
 let activeClientId = null;
+const specialistId = localStorage.getItem('specialist_id') || null;
 
 async function renderClients() {
     if (window.supabaseClient) {
@@ -82,7 +83,7 @@ async function renderMessages() {
         if (messages) {
             messages.forEach(msg => {
                 const div = document.createElement('div');
-                div.className = `message ${msg.sender_type === 'client' ? 'client-msg' : 'agent-msg'}`;
+                div.className = `message ${msg.sender_type === 'cliente' ? 'client-msg' : 'agent-msg'}`;
                 
                 let parsed = null;
                 try {
@@ -332,12 +333,16 @@ if (agentFileInput) {
             const tenantId = localStorage.getItem('tenant_id');
             await window.supabaseClient.from('chat_messages').insert({
                 client_id: activeClientId,
-                sender_type: 'specialist',
+                especialista_id: specialistId,
+                sender_type: 'especialista',
                 content: data.publicUrl,
                 created_at: new Date(),
                 tenant_id: tenantId
             });
-            await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
+            await window.supabaseClient.from('chat_clients').update({ 
+                status: 'em_atendimento',
+                especialista_id: specialistId 
+            }).eq('id', activeClientId);
             renderMessages();
         }
         
@@ -355,12 +360,16 @@ document.getElementById('agentSendBtn').onclick = async () => {
         const tenantId = localStorage.getItem('tenant_id');
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
-            sender_type: 'specialist',
+            especialista_id: specialistId,
+            sender_type: 'especialista',
             content: text,
             created_at: new Date(),
             tenant_id: tenantId
         });
-        await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
+        await window.supabaseClient.from('chat_clients').update({ 
+            status: 'em_atendimento',
+            especialista_id: specialistId
+        }).eq('id', activeClientId);
     } else {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
         if (chats[activeClientId]) {
