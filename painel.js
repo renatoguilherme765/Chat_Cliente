@@ -325,11 +325,13 @@ if (agentFileInput) {
             .getPublicUrl(filePath);
 
         if (data && data.publicUrl) {
+            const tenantId = localStorage.getItem('tenant_id');
             await window.supabaseClient.from('chat_messages').insert({
                 client_id: activeClientId,
                 sender_type: 'specialist',
                 content: data.publicUrl,
-                created_at: new Date()
+                created_at: new Date(),
+                tenant_id: tenantId
             });
             await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
             renderMessages();
@@ -346,11 +348,13 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (!text || !activeClientId) return;
 
     if (window.supabaseClient) {
+        const tenantId = localStorage.getItem('tenant_id');
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
             sender_type: 'specialist',
             content: text,
-            created_at: new Date()
+            created_at: new Date(),
+            tenant_id: tenantId
         });
         await window.supabaseClient.from('chat_clients').update({ status: 'em_atendimento' }).eq('id', activeClientId);
     } else {
