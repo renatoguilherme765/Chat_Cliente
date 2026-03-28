@@ -264,7 +264,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   createClientIfNotExists();
 
   // 2 e 4. Salvar mensagens no Supabase
-  async function saveMessageToSupabase(text, type, htmlContent) {
+  async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
     if (!window.supabaseClient) return;
     await createClientIfNotExists();
 
@@ -273,33 +273,42 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     localMessages.add(messageText);
 
-    await window.supabaseClient.from("chat_messages").insert([
-      {
-        client_id: clientId,
-        content: messageText,
-        sender_type: sender,
-        created_at: new Date(),
-        tenant_id: tenantId,
-      },
-    ]);
+    try {
+      const { error } = await window.supabaseClient.from("chat_messages").insert([
+        {
+          client_id: clientId,
+          content: messageText,
+          sender_type: sender,
+          created_at: new Date(),
+          tenant_id: tenantId,
+        },
+      ]);
+
+      if (!error && msgDiv && msgDiv._statusSpan) {
+        // Ícone de check (enviado)
+        msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+        msgDiv._statusSpan.style.opacity = "1";
+        msgDiv._statusSpan.title = "Enviada";
+      }
+    } catch (err) {
+      console.error("Erro ao salvar mensagem no Supabase:", err);
+    }
   }
 
   // 5. Escutar mensagens em tempo real
   if (window.supabaseClient) {
     window.supabaseClient
-      .channel("chat_messages")
+      .channel(`chat_messages_${clientId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "chat_messages",
+          filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (
-            payload.new.client_id === clientId &&
-            payload.new.sender_type === "specialist"
-          ) {
+          if (payload.new.sender_type === "specialist") {
             // Evita duplicar mensagens que o próprio sistema local enviou
             if (!localMessages.has(payload.new.content)) {
               let parsed;
@@ -495,12 +504,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const timeDiv = document.createElement("div");
     timeDiv.classList.add("message-time");
+    timeDiv.style.display = "flex";
+    timeDiv.style.alignItems = "center";
+    timeDiv.style.justifyContent = "flex-end";
+    timeDiv.style.gap = "4px";
 
+    const timeSpan = document.createElement("span");
     const dateObj = createdAt ? new Date(createdAt) : new Date();
-    timeDiv.textContent = dateObj.toLocaleTimeString("pt-BR", {
+    timeSpan.textContent = dateObj.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
     });
+    timeDiv.appendChild(timeSpan);
+
+    if (type === "user") {
+      const statusSpan = document.createElement("span");
+      statusSpan.classList.add("message-status");
+      if (save) {
+        // Ícone de relógio (enviando)
+        statusSpan.innerHTML =
+          '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>';
+        statusSpan.style.opacity = "0.5";
+      } else {
+        // Ícone de check (já enviado/histórico)
+        statusSpan.innerHTML =
+          '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+        statusSpan.style.opacity = "1";
+      }
+      timeDiv.appendChild(statusSpan);
+      msgDiv._statusSpan = statusSpan;
+    }
 
     msgDiv.appendChild(timeDiv);
 
@@ -508,7 +541,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     chatArea.scrollTop = chatArea.scrollHeight;
 
     if (save) {
-      saveMessageToSupabase(text, type, htmlContent);
+      saveMessageToSupabase(text, type, htmlContent, msgDiv);
     }
   }
 
