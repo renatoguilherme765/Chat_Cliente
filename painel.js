@@ -87,7 +87,9 @@ async function renderMessages() {
                 let parsed = null;
                 try {
                     parsed = JSON.parse(msg.content);
-                } catch (e) {}
+                } catch {
+                    // Ignorar erro de parse
+                }
 
                 if (parsed && parsed.__isFile) {
                     if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
@@ -176,7 +178,9 @@ async function renderMessages() {
                 let parsed = null;
                 try {
                     parsed = JSON.parse(msg.content);
-                } catch (e) {}
+                } catch {
+                    // Ignorar erro de parse
+                }
 
                 if (msg.htmlContent) {
                     div.innerHTML = msg.htmlContent;

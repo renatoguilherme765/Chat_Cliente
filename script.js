@@ -179,10 +179,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       tenantId = tenantData.id;
       localStorage.setItem("tenant_id", tenantId);
 
-      // Opcional: Atualizar o nome da empresa no cabeçalho
+      // Atualizar o nome da empresa no cabeçalho com o nome recuperado
       const headerTitle = document.querySelector(".header-title h1");
       if (headerTitle) {
-        headerTitle.textContent = tenantData.nome;
+        headerTitle.textContent = tenantData.nome || 'Atendimento Digital';
       }
     }
   }
