@@ -942,6 +942,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
       // apenas salva a mensagem para o especialista ver
+      await saveMessageToSupabase(text, "user");
       return;
     }
 
