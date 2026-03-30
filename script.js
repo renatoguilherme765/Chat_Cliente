@@ -322,7 +322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender_type === "especialista") {
+          if (payload.new.sender_type === "especialista" || payload.new.sender_type === "bot") {
             // Evita duplicar mensagens que o próprio sistema local enviou
             if (!localMessages.has(payload.new.content)) {
               let parsed;
@@ -727,9 +727,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     return false;
   }
 
+  window.loadExistingMessages = loadExistingMessages;
+
   // Fluxo Inicial
   async function initChat() {
-    const isNegociarRoute =
       window.location.pathname.replace(/\/$/, "") === "/negociar";
     const isWhatsappOrigin = origem === "whatsapp";
 
@@ -878,6 +879,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             .from("chat_clients")
             .update({ status: "aguardando" })
             .eq("id", clientId);
+          window.loadExistingMessages();
         }
       }, 800);
     } else if (action === "gerar_boleto") {
