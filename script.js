@@ -731,6 +731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Fluxo Inicial
   async function initChat() {
+    const isNegociarRoute =
       window.location.pathname.replace(/\/$/, "") === "/negociar";
     const isWhatsappOrigin = origem === "whatsapp";
 
