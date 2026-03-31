@@ -213,15 +213,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
-  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
-  let isReturningClient = !!clientId;
+  // 1. Gerar um novo client_id único para cada nova sessão
+  let clientId = crypto.randomUUID();
+  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  let isReturningClient = false;
   
-  if (!clientId) {
-    clientId = crypto.randomUUID();
-    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  }
-
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
     chatArea.innerHTML = "";
