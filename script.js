@@ -219,8 +219,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
   let isReturningClient = false;
   
-  // 2. Garantir que a área de chat comece vazia
-  if (chatArea) {
+  // 2. Garantir que a área de chat comece vazia apenas se não for um cliente retornando
+  if (chatArea && !isReturningClient) {
     chatArea.innerHTML = "";
   }
 
@@ -296,7 +296,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       await createClientIfNotExists();
 
-      let sender = type === "user" ? "client" : "system";
+      let sender = type === "user" ? "client" : (type === "bot" ? "bot" : "system");
       let messageText = text || htmlContent;
 
       localMessages.add(messageText);
@@ -482,9 +482,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const msgDiv = document.createElement("div");
     if (!htmlContent || !htmlContent.includes("pdf-clean")) {
       msgDiv.classList.add("message");
-      msgDiv.classList.add(type === "system" ? "system-msg" : "user-msg");
+      msgDiv.classList.add(type === "user" ? "user-msg" : "system-msg");
     } else {
-      msgDiv.style.alignSelf = type === "system" ? "flex-start" : "flex-end";
+      msgDiv.style.alignSelf = type === "user" ? "flex-end" : "flex-start";
       msgDiv.style.animation =
         "fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
       msgDiv.style.margin = "4px 0";
@@ -808,7 +808,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         const msg =
           "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
-        addMessage(null, "system", msg);
+        addMessage(null, "bot", msg);
         currentStep = "cpf_whatsapp";
       }, 500);
     } else {
@@ -816,7 +816,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Olá 👋 Identificamos uma condição especial para regularização do seu contrato.",
-          "system",
+          "bot",
         );
 
         setTimeout(() => {
@@ -830,7 +830,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             </div>
                         </div>
                     `;
-          addMessage(null, "system", cardHtml);
+          addMessage(null, "bot", cardHtml);
         }, 1000);
       }, 500);
     }
