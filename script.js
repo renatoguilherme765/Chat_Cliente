@@ -313,16 +313,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender_type === "especialista" || payload.new.sender_type === "bot") {
+          if (payload.new.sender === "specialist" || payload.new.sender === "system") {
             // Evita duplicar mensagens que o próprio sistema local enviou
-            if (!localMessages.has(payload.new.content)) {
+            if (!localMessages.has(payload.new.text)) {
               let parsed;
 
               try {
                 parsed =
-                  typeof payload.new.content === "string"
-                    ? JSON.parse(payload.new.content)
-                    : payload.new.content;
+                  typeof payload.new.text === "string"
+                    ? JSON.parse(payload.new.text)
+                    : payload.new.text;
               } catch {
                 parsed = null;
               }
@@ -399,7 +399,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
               } else {
                 addMessage(
-                  payload.new.content,
+                  payload.new.text,
                   "system",
                   null,
                   false,
