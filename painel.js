@@ -83,11 +83,11 @@ async function renderMessages() {
         if (messages) {
             messages.forEach(msg => {
                 const div = document.createElement('div');
-                div.className = `message ${msg.sender_type === 'cliente' ? 'client-msg' : 'agent-msg'}`;
+                div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
                 
                 let parsed = null;
                 try {
-                    parsed = JSON.parse(msg.content);
+                    parsed = JSON.parse(msg.text);
                 } catch {
                     // Ignorar erro de parse
                 }
@@ -125,12 +125,12 @@ async function renderMessages() {
                           </div>
                         `;
                     }
-                } else if (msg.content.startsWith('http')) {
-                    const isImage = msg.content.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                } else if (msg.text.startsWith('http')) {
+                    const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                     if (isImage) {
-                        div.innerHTML = `<img src="${msg.content}" style="max-width: 100%; border-radius: 8px;" />`;
+                        div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
                     } else {
-                        const fileName = msg.content.split('/').pop() || 'Documento';
+                        const fileName = msg.text.split('/').pop() || 'Documento';
                         div.innerHTML = `
                           <div style="
                             display:flex;
@@ -149,7 +149,7 @@ async function renderMessages() {
                             ">
                               ${fileName}
                             </div>
-                            <a href="${msg.content}" download style="
+                            <a href="${msg.text}" download style="
                               margin-top:6px;
                               font-size:12px;
                               color:#2563eb;
@@ -162,7 +162,7 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    div.innerHTML = msg.content;
+                    div.innerHTML = msg.text;
                 }
                 
                 chatMessages.appendChild(div);
@@ -331,14 +331,13 @@ if (agentFileInput) {
 
         if (data && data.publicUrl) {
             const tenantId = localStorage.getItem('tenant_id');
-            await window.supabaseClient.from('chat_messages').insert({
-                client_id: activeClientId,
-                especialista_id: specialistId,
-                sender_type: 'especialista',
-                content: data.publicUrl,
-                created_at: new Date(),
-                tenant_id: tenantId
-            });
+        await window.supabaseClient.from('chat_messages').insert({
+            client_id: activeClientId,
+            especialista_id: specialistId,
+            sender: 'system',
+            text: data.publicUrl,
+            created_at: new Date()
+        });
             await window.supabaseClient.from('chat_clients').update({ 
                 status: 'em_atendimento',
                 especialista_id: specialistId 
@@ -361,10 +360,9 @@ document.getElementById('agentSendBtn').onclick = async () => {
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
             especialista_id: specialistId,
-            sender_type: 'especialista',
-            content: text,
-            created_at: new Date(),
-            tenant_id: tenantId
+            sender: 'system',
+            text: text,
+            created_at: new Date()
         });
         await window.supabaseClient.from('chat_clients').update({ 
             status: 'em_atendimento',

@@ -281,9 +281,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
-          client_id: clientId, // UUID garantido do cliente atual
-          content: messageText, // Usando 'content' para manter compatibilidade com o painel.js
-          sender_type: sender   // Usando 'sender_type' para manter compatibilidade com o painel.js
+          client_id: clientId,
+          text: messageText,
+          sender: sender === 'cliente' ? 'client' : 'system'
         },
       ]);
 
@@ -828,10 +828,9 @@ document.addEventListener("DOMContentLoaded", async () => {
               {
                 client_id: clientId,
                 especialista_id: null,
-                content: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                sender_type: "cliente",
+                text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                sender: "client",
                 created_at: new Date(),
-                tenant_id: tenantId,
               },
             ]);
             await window.supabaseClient
@@ -908,10 +907,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 {
                   client_id: clientId,
                   especialista_id: null,
-                  content: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
-                  sender_type: "cliente",
+                  text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
+                  sender: "client",
                   created_at: new Date(),
-                  tenant_id: tenantId,
                 },
               ]);
               await window.supabaseClient
