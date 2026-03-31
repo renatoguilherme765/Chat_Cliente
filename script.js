@@ -80,15 +80,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!storedDoc) {
           const { data: msgs } = await window.supabaseClient
             .from("chat_messages")
-            .select("text")
+            .select("content")
             .eq("client_id", clientId)
-            .eq("sender", "client")
+            .eq("tenant_id", tenantId)
+            .eq("sender_type", "cliente")
             .order("created_at", { ascending: true });
 
           if (msgs && msgs.length > 0) {
             // Procura a primeira mensagem que parece um CPF/CNPJ (apenas números, length >= 11)
             for (const msg of msgs) {
-              const cleanText = msg.text.replace(/\D/g, "");
+              const cleanText = msg.content.replace(/\D/g, "");
               if (cleanText.length >= 11 && cleanText.length <= 14) {
                 storedDoc = cleanText;
                 break;
@@ -224,15 +225,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     chatArea.innerHTML = "";
   }
 
-  // Estado inicial das mensagens do bot
-  const initialBotMessages = [
-    { id: '1', text: 'Olá! Sou o assistente virtual da ML Gomes.', sender: 'bot' },
-    { id: '2', text: 'Para começar seu atendimento, qual o seu nome?', sender: 'bot' }
-  ];
-
-  // Renderizar mensagens iniciais
-  initialBotMessages.forEach(msg => addMessage(msg.text, 'system', null, false));
-
   const localMessages = new Set();
   let clientEnsured = false;
 
@@ -286,12 +278,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       // Inserção simplificada para evitar erro 400 (Bad Request)
-      // Usando APENAS as colunas que existem no schema: client_id, text, sender
+      // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId, // UUID garantido do cliente atual
-          text: messageText,   // Conteúdo da mensagem
-          sender: type === "user" ? "client" : "bot" // 'client' para o usuário
+          content: messageText, // Usando 'content' para manter compatibilidade com o painel.js
+          sender_type: sender   // Usando 'sender_type' para manter compatibilidade com o painel.js
         },
       ]);
 
@@ -321,16 +313,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender === "specialist" || payload.new.sender === "bot" || payload.new.sender === "system") {
+          if (payload.new.sender_type === "especialista" || payload.new.sender_type === "bot") {
             // Evita duplicar mensagens que o próprio sistema local enviou
-            if (!localMessages.has(payload.new.text)) {
+            if (!localMessages.has(payload.new.content)) {
               let parsed;
 
               try {
                 parsed =
-                  typeof payload.new.text === "string"
-                    ? JSON.parse(payload.new.text)
-                    : payload.new.text;
+                  typeof payload.new.content === "string"
+                    ? JSON.parse(payload.new.content)
+                    : payload.new.content;
               } catch {
                 parsed = null;
               }
@@ -407,7 +399,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
               } else {
                 addMessage(
-                  payload.new.text,
+                  payload.new.content,
                   "system",
                   null,
                   false,
@@ -566,29 +558,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       .from("chat_messages")
       .select("*")
       .eq("client_id", clientId)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: true });
 
     if (messages && messages.length > 0) {
       messages.forEach((msg) => {
         // Não mostra a mensagem oculta de solicitação de boleto para o cliente
         if (
-          msg.text ===
+          msg.content ===
           "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto."
         )
           return;
         if (
-          msg.text ===
+          msg.content ===
           "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições."
         )
           return;
 
-        const type = msg.sender === "client" ? "user" : "system";
+        const type = msg.sender_type === "cliente" ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
         let parsed;
 
         try {
           parsed =
-            typeof msg.text === "string" ? JSON.parse(msg.text) : msg.text;
+            typeof msg.content === "string" ? JSON.parse(msg.content) : msg.content;
         } catch {
           parsed = null;
         }
@@ -652,7 +645,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage(null, type, fileHtml, false, msg.created_at);
           }
         } else {
-          addMessage(msg.text, type, null, false, msg.created_at);
+          addMessage(msg.content, type, null, false, msg.created_at);
         }
       });
 
@@ -679,8 +672,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const reversedMessages = [...messages].reverse();
         for (const msg of reversedMessages) {
-          if (msg.sender === "specialist" || msg.sender === "system" || msg.sender === "bot") {
-            const text = msg.text || "";
+          if (msg.sender_type === "especialista" || msg.sender_type === "system") {
+            const text = msg.content || "";
             if (
               text.includes("Gerando boleto") ||
               text.includes("conectado a um especialista")
@@ -733,7 +726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.pathname.replace(/\/$/, "") === "/negociar";
     const isWhatsappOrigin = origem === "whatsapp";
 
-    // Garantir que o campo de digitação esteja visível, mas desabilitado inicialmente
+    // Garantir que o campo de digitação esteja visível e ativo
     const footer = document.querySelector(".footer");
     if (footer) {
       footer.style.display = "block";
@@ -744,22 +737,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     userInput.disabled = false;
     sendBtn.disabled = false;
 
-    // Se for cliente retornando, tenta carregar histórico, mas mantém o bot inicial
-    // Apenas se o cliente já tiver passado pelo bot (status em_atendimento ou aguardando)
+    // Tentar carregar histórico se for cliente retornando
     if (isReturningClient) {
-      const { data: clientData } = await window.supabaseClient
-        .from("chat_clients")
-        .select("status")
-        .eq("id", clientId)
-        .eq("tenant_id", tenantId)
-        .single();
-
-      if (clientData && (clientData.status === "em_atendimento" || clientData.status === "aguardando")) {
-        await loadExistingMessages();
+      const hasHistory = await loadExistingMessages();
+      if (hasHistory) {
+        return; // Se já tem histórico, não roda o fluxo inicial de boas vindas
       }
     }
 
-    currentStep = "nome";
+    if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
+      // Fluxo Automático (WhatsApp ou /negociar)
+      setTimeout(() => {
+        const msg =
+          "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
+        addMessage(null, "system", msg);
+        currentStep = "cpf_whatsapp";
+      }, 500);
+    } else {
+      // Fluxo Normal
+      setTimeout(() => {
+        addMessage(
+          "Olá 👋 Identificamos uma condição especial para regularização do seu contrato.",
+          "system",
+        );
+
+        setTimeout(() => {
+          const cardHtml = `
+                        <div class="welcome-card">
+                            <img src="https://images.pexels.com/photos/3769021/pexels-photo-3769021.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Mulher feliz olhando para o celular" class="card-image" style="width: 100%; height: 200px; object-fit: cover; object-position: center 30%; border-radius: 10px 10px 0 0; background-color: #e0e0e0; display: block;" referrerpolicy="no-referrer">
+                            <div class="card-content">
+                                <h3>Zere sua dívida hoje!</h3>
+                                <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
+                                <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+                            </div>
+                        </div>
+                    `;
+          addMessage(null, "system", cardHtml);
+        }, 1000);
+      }, 500);
+    }
   }
 
   // Manipulador de Ações de Botões
@@ -811,8 +827,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             await window.supabaseClient.from("chat_messages").insert([
               {
                 client_id: clientId,
-                text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                sender: "client"
+                especialista_id: null,
+                content: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                sender_type: "cliente",
+                created_at: new Date(),
+                tenant_id: tenantId,
               },
             ]);
             await window.supabaseClient
@@ -888,8 +907,11 @@ document.addEventListener("DOMContentLoaded", async () => {
               await window.supabaseClient.from("chat_messages").insert([
                 {
                   client_id: clientId,
-                  text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
-                  sender: "client"
+                  especialista_id: null,
+                  content: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
+                  sender_type: "cliente",
+                  created_at: new Date(),
+                  tenant_id: tenantId,
                 },
               ]);
               await window.supabaseClient
