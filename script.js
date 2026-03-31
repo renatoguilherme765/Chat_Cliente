@@ -724,7 +724,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.pathname.replace(/\/$/, "") === "/negociar";
     const isWhatsappOrigin = origem === "whatsapp";
 
-    // Garantir que o campo de digitação esteja visível e ativo
+    // Garantir que o campo de digitação esteja visível, mas desabilitado inicialmente
     const footer = document.querySelector(".footer");
     if (footer) {
       footer.style.display = "block";
@@ -732,13 +732,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       footer.style.opacity = "1";
     }
     userInput.placeholder = "Digite sua mensagem...";
-    userInput.disabled = false;
-    sendBtn.disabled = false;
+    userInput.disabled = true;
+    sendBtn.disabled = true;
 
     // Tentar carregar histórico se for cliente retornando
     if (isReturningClient) {
       const hasHistory = await loadExistingMessages();
       if (hasHistory) {
+        userInput.disabled = false;
+        sendBtn.disabled = false;
         return; // Se já tem histórico, não roda o fluxo inicial de boas vindas
       }
     }
@@ -748,31 +750,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         const msg =
           "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
-        addMessage(null, "system", msg);
+        addMessage(null, "system", msg, false);
         currentStep = "cpf_whatsapp";
+        userInput.disabled = false;
+        sendBtn.disabled = false;
       }, 500);
     } else {
       // Fluxo Normal
+      addMessage('Olá! Sou o assistente virtual da ML Gomes.', 'system', null, false);
       setTimeout(() => {
-        addMessage(
-          "Olá 👋 Identificamos uma condição especial para regularização do seu contrato.",
-          "system",
-        );
-
-        setTimeout(() => {
-          const cardHtml = `
-                        <div class="welcome-card">
-                            <img src="https://images.pexels.com/photos/3769021/pexels-photo-3769021.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Mulher feliz olhando para o celular" class="card-image" style="width: 100%; height: 200px; object-fit: cover; object-position: center 30%; border-radius: 10px 10px 0 0; background-color: #e0e0e0; display: block;" referrerpolicy="no-referrer">
-                            <div class="card-content">
-                                <h3>Zere sua dívida hoje!</h3>
-                                <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
-                                <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
-                            </div>
-                        </div>
-                    `;
-          addMessage(null, "system", cardHtml);
-        }, 1000);
-      }, 500);
+        addMessage('Para começar seu atendimento, qual o seu nome?', 'system', null, false);
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        currentStep = "nome";
+      }, 1000);
     }
   }
 
