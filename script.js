@@ -206,6 +206,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let userName = "";
   let isSending = false;
   let isInsertingMessage = false;
+  let currentSpecialistId = null;
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -254,6 +255,29 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
 
           await window.supabaseClient.from("chat_clients").insert([insertData]);
+        } else {
+          // Se o cliente já existe, buscar especialista atribuído
+          const { data: clientData } = await window.supabaseClient
+            .from("chat_clients")
+            .select("especialista_id")
+            .eq("id", clientId)
+            .single();
+          
+          if (clientData && clientData.especialista_id) {
+            currentSpecialistId = clientData.especialista_id;
+            const { data: specialistData } = await window.supabaseClient
+              .from("specialists")
+              .select("name")
+              .eq("id", currentSpecialistId)
+              .single();
+            
+            if (specialistData) {
+              const headerTitle = document.querySelector(".header-title h1");
+              if (headerTitle) {
+                headerTitle.textContent = `Falando com: ${specialistData.name}`;
+              }
+            }
+          }
         }
         clientCreated = true;
       })();
@@ -282,7 +306,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         {
           client_id: clientId,
           text: messageText,
-          sender: sender
+          sender: sender,
+          especialista_id: currentSpecialistId
         },
       ]);
 
@@ -303,6 +328,38 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 5. Escutar mensagens em tempo real
   if (window.supabaseClient) {
+    window.supabaseClient
+      .channel(`chat_clients_${clientId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_clients",
+          filter: `id=eq.${clientId}`,
+        },
+        async (payload) => {
+          if (payload.new.especialista_id && payload.new.especialista_id !== currentSpecialistId) {
+            currentSpecialistId = payload.new.especialista_id;
+            
+            // Buscar nome do especialista
+            const { data: specialistData } = await window.supabaseClient
+              .from("specialists")
+              .select("name")
+              .eq("id", currentSpecialistId)
+              .single();
+            
+            if (specialistData) {
+              const headerTitle = document.querySelector(".header-title h1");
+              if (headerTitle) {
+                headerTitle.textContent = `Falando com: ${specialistData.name}`;
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
     window.supabaseClient
       .channel(`chat_messages_${clientId}`)
       .on(
