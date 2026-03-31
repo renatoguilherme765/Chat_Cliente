@@ -205,6 +205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let isLiveChat = false;
   let userName = "";
   let isSending = false;
+  let isInsertingMessage = false;
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -269,22 +270,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient) return;
-    await createClientIfNotExists();
-
-    let sender = type === "user" ? "cliente" : "system";
-    let messageText = text || htmlContent;
-
-    localMessages.add(messageText);
+    if (!window.supabaseClient || isInsertingMessage) return;
+    isInsertingMessage = true;
 
     try {
+      await createClientIfNotExists();
+
+      let sender = type === "user" ? "client" : "system";
+      let messageText = text || htmlContent;
+
+      localMessages.add(messageText);
+
       // Inserção simplificada para evitar erro 400 (Bad Request)
-      // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
           text: messageText,
-          sender: sender === 'cliente' ? 'client' : 'system'
+          sender: sender
         },
       ]);
 
@@ -298,6 +300,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (err) {
       console.error("Erro ao salvar mensagem no Supabase:", err);
+    } finally {
+      isInsertingMessage = false;
     }
   }
 
