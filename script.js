@@ -80,16 +80,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!storedDoc) {
           const { data: msgs } = await window.supabaseClient
             .from("chat_messages")
-            .select("content")
+            .select("text")
             .eq("client_id", clientId)
-            .eq("tenant_id", tenantId)
-            .eq("sender_type", "cliente")
+            .eq("sender", "client")
             .order("created_at", { ascending: true });
 
           if (msgs && msgs.length > 0) {
             // Procura a primeira mensagem que parece um CPF/CNPJ (apenas números, length >= 11)
             for (const msg of msgs) {
-              const cleanText = msg.content.replace(/\D/g, "");
+              const cleanText = msg.text.replace(/\D/g, "");
               if (cleanText.length >= 11 && cleanText.length <= 14) {
                 storedDoc = cleanText;
                 break;
@@ -271,37 +270,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!window.supabaseClient) return;
     await createClientIfNotExists();
 
-    // Busca o especialista_id atual do cliente
-    let especialista_id = null;
-    try {
-      const { data: clientData } = await window.supabaseClient
-        .from("chat_clients")
-        .select("especialista_id")
-        .eq("id", clientId)
-        .single();
-      if (clientData) especialista_id = clientData.especialista_id;
-    } catch (e) {
-      console.warn("Não foi possível buscar especialista_id:", e);
-    }
-
-    let sender = type === "user" ? "cliente" : "especialista";
+    let sender = type === "user" ? "cliente" : "system";
     let messageText = text || htmlContent;
 
     localMessages.add(messageText);
 
     try {
+      // Inserção simplificada para evitar erro 400 (Bad Request)
+      // Usando APENAS as colunas que existem no schema: client_id, text, sender
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
-          client_id: clientId,
-          especialista_id: especialista_id,
-          content: messageText,
-          sender_type: sender,
-          created_at: new Date(),
-          tenant_id: tenantId,
+          client_id: clientId, // UUID garantido do cliente atual
+          text: messageText,   // Conteúdo da mensagem
+          sender: type === "user" ? "client" : "bot" // 'client' para o usuário
         },
       ]);
 
-      if (!error && msgDiv && msgDiv._statusSpan) {
+      if (error) {
+        console.error("Erro do Supabase ao inserir mensagem:", error);
+      } else if (msgDiv && msgDiv._statusSpan) {
         // Ícone de check (enviado)
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
         msgDiv._statusSpan.style.opacity = "1";
@@ -325,16 +312,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender_type === "especialista" || payload.new.sender_type === "bot") {
+          if (payload.new.sender === "specialist" || payload.new.sender === "bot" || payload.new.sender === "system") {
             // Evita duplicar mensagens que o próprio sistema local enviou
-            if (!localMessages.has(payload.new.content)) {
+            if (!localMessages.has(payload.new.text)) {
               let parsed;
 
               try {
                 parsed =
-                  typeof payload.new.content === "string"
-                    ? JSON.parse(payload.new.content)
-                    : payload.new.content;
+                  typeof payload.new.text === "string"
+                    ? JSON.parse(payload.new.text)
+                    : payload.new.text;
               } catch {
                 parsed = null;
               }
@@ -411,7 +398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
               } else {
                 addMessage(
-                  payload.new.content,
+                  payload.new.text,
                   "system",
                   null,
                   false,
@@ -570,30 +557,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       .from("chat_messages")
       .select("*")
       .eq("client_id", clientId)
-      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: true });
 
     if (messages && messages.length > 0) {
       messages.forEach((msg) => {
         // Não mostra a mensagem oculta de solicitação de boleto para o cliente
         if (
-          msg.content ===
+          msg.text ===
           "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto."
         )
           return;
         if (
-          msg.content ===
+          msg.text ===
           "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições."
         )
           return;
 
-        const type = msg.sender_type === "cliente" ? "user" : "system";
+        const type = msg.sender === "client" ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
         let parsed;
 
         try {
           parsed =
-            typeof msg.content === "string" ? JSON.parse(msg.content) : msg.content;
+            typeof msg.text === "string" ? JSON.parse(msg.text) : msg.text;
         } catch {
           parsed = null;
         }
@@ -657,7 +643,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage(null, type, fileHtml, false, msg.created_at);
           }
         } else {
-          addMessage(msg.content, type, null, false, msg.created_at);
+          addMessage(msg.text, type, null, false, msg.created_at);
         }
       });
 
@@ -684,8 +670,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const reversedMessages = [...messages].reverse();
         for (const msg of reversedMessages) {
-          if (msg.sender_type === "especialista" || msg.sender_type === "system") {
-            const text = msg.content || "";
+          if (msg.sender === "specialist" || msg.sender === "system" || msg.sender === "bot") {
+            const text = msg.text || "";
             if (
               text.includes("Gerando boleto") ||
               text.includes("conectado a um especialista")
@@ -839,11 +825,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             await window.supabaseClient.from("chat_messages").insert([
               {
                 client_id: clientId,
-                especialista_id: null,
-                content: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                sender_type: "cliente",
-                created_at: new Date(),
-                tenant_id: tenantId,
+                text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                sender: "client"
               },
             ]);
             await window.supabaseClient
@@ -919,11 +902,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               await window.supabaseClient.from("chat_messages").insert([
                 {
                   client_id: clientId,
-                  especialista_id: null,
-                  content: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
-                  sender_type: "cliente",
-                  created_at: new Date(),
-                  tenant_id: tenantId,
+                  text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
+                  sender: "client"
                 },
               ]);
               await window.supabaseClient
