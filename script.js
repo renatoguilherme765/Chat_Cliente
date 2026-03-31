@@ -211,11 +211,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Limpar histórico anterior e gerar um novo client_id a cada acesso
-  localStorage.removeItem(`chat_client_id_${tenantId}`);
-  let clientId = crypto.randomUUID();
-  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  let isReturningClient = false;
+  // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
+  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  let isReturningClient = !!clientId;
+  
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  }
 
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
