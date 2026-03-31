@@ -224,6 +224,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     chatArea.innerHTML = "";
   }
 
+  // Estado inicial das mensagens do bot
+  const initialBotMessages = [
+    { id: '1', text: 'Olá! Sou o assistente virtual da ML Gomes.', sender: 'bot' },
+    { id: '2', text: 'Para começar seu atendimento, qual o seu nome?', sender: 'bot' }
+  ];
+
+  // Renderizar mensagens iniciais
+  initialBotMessages.forEach(msg => addMessage(msg.text, 'system', null, false));
+
   const localMessages = new Set();
   let clientEnsured = false;
 
@@ -732,39 +741,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       footer.style.opacity = "1";
     }
     userInput.placeholder = "Digite sua mensagem...";
-    userInput.disabled = true;
-    sendBtn.disabled = true;
+    userInput.disabled = false;
+    sendBtn.disabled = false;
 
-    // Tentar carregar histórico se for cliente retornando
+    // Se for cliente retornando, tenta carregar histórico, mas mantém o bot inicial
+    // Apenas se o cliente já tiver passado pelo bot (status em_atendimento ou aguardando)
     if (isReturningClient) {
-      const hasHistory = await loadExistingMessages();
-      if (hasHistory) {
-        userInput.disabled = false;
-        sendBtn.disabled = false;
-        return; // Se já tem histórico, não roda o fluxo inicial de boas vindas
+      const { data: clientData } = await window.supabaseClient
+        .from("chat_clients")
+        .select("status")
+        .eq("id", clientId)
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (clientData && (clientData.status === "em_atendimento" || clientData.status === "aguardando")) {
+        await loadExistingMessages();
       }
     }
 
-    if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
-      // Fluxo Automático (WhatsApp ou /negociar)
-      setTimeout(() => {
-        const msg =
-          "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
-        addMessage(null, "system", msg, false);
-        currentStep = "cpf_whatsapp";
-        userInput.disabled = false;
-        sendBtn.disabled = false;
-      }, 500);
-    } else {
-      // Fluxo Normal
-      addMessage('Olá! Sou o assistente virtual da ML Gomes.', 'system', null, false);
-      setTimeout(() => {
-        addMessage('Para começar seu atendimento, qual o seu nome?', 'system', null, false);
-        userInput.disabled = false;
-        sendBtn.disabled = false;
-        currentStep = "nome";
-      }, 1000);
-    }
+    currentStep = "nome";
   }
 
   // Manipulador de Ações de Botões
