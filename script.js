@@ -204,6 +204,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentStep = "start";
   let isLiveChat = false;
   let userName = "";
+  let isSending = false;
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -925,16 +926,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Lógica de Envio de Mensagem
   async function handleSend() {
+    if (isSending) return;
     const text = userInput.value.trim();
     if (!text) return;
 
+    isSending = true;
+    userInput.value = ""; // Clear immediately
+
     addMessage(text, "user");
-    userInput.value = "";
 
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
       // apenas salva a mensagem para o especialista ver
       await saveMessageToSupabase(text, "user");
+      isSending = false;
       return;
     }
 
@@ -951,6 +956,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage("Agora, por favor, digite seu primeiro NOME.", "system");
             currentStep =
               currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
+            isSending = false;
           }, 800);
         }, 800);
       } else {
@@ -966,6 +972,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               "system",
             );
           }
+          isSending = false;
         }, 800);
       }
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
@@ -996,6 +1003,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 .update({ status: "em_atendimento" })
                 .eq("id", clientId);
             }
+            isSending = false;
           }, 800);
         } else {
           setTimeout(() => {
@@ -1016,12 +1024,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                             `;
               addMessage(null, "system", options);
               currentStep = "nome_recebido";
+              isSending = false;
             }, 1500);
           }, 800);
         }
       } else {
         setTimeout(() => {
           addMessage("Por favor, digite um nome válido.", "system");
+          isSending = false;
         }, 800);
       }
     } else if (currentStep === "nome_recebido") {
@@ -1042,6 +1052,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
         }, 800);
       }
+      isSending = false;
     }
   }
 
