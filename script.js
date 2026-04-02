@@ -213,12 +213,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Gerar um novo client_id único para cada sessão (atualização de página)
-  let clientId = crypto.randomUUID();
-  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  // 1. Recuperar ou gerar client_id persistente
+  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
   let isReturningClient = false;
+  if (clientId) {
+    isReturningClient = true;
+  } else {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  }
   
-  // 2. Garantir que a área de chat comece vazia
+  // 2. Garantir que a área de chat comece vazia (opcional: se quiser manter histórico, remover esta linha)
   if (chatArea) {
     chatArea.innerHTML = "";
   }
@@ -226,7 +231,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const localMessages = new Set();
   let clientEnsured = false;
 
-  // 3. Criar cliente na tabela chat_clients
+  // 3. Criar cliente na tabela chat_clients (se não existir)
   let clientCreated = false;
   let createClientPromise = null;
 
