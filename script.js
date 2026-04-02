@@ -213,10 +213,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Gerar um novo client_id único para cada nova sessão
-  let clientId = crypto.randomUUID();
-  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  // 1. Recuperar ou gerar um client_id único para a sessão
+  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
   let isReturningClient = false;
+  
+  if (clientId) {
+    isReturningClient = true;
+  } else {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  }
   
   // 2. Garantir que a área de chat comece vazia apenas se não for um cliente retornando
   if (chatArea && !isReturningClient) {
@@ -332,15 +338,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       localMessages.add(messageText);
 
+      const payload = {
+        client_id: clientId,
+        text: messageText,
+        sender: sender,
+        created_at: new Date().toISOString()
+      };
+      if (currentSpecialistId) {
+        payload.especialista_id = currentSpecialistId;
+      }
+
       console.log(`Enviando insert para Supabase: clientId=${clientId}, sender=${sender}`);
-      const { error } = await window.supabaseClient.from("chat_messages").insert([
-        {
-          client_id: clientId,
-          text: messageText,
-          sender: sender,
-          especialista_id: currentSpecialistId
-        },
-      ]);
+      const { error } = await window.supabaseClient.from("chat_messages").insert([payload]);
 
       if (error) {
         console.error("FALHA CRÍTICA AO GRAVAR NO BANCO:", error);
@@ -922,7 +931,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 especialista_id: null,
                 text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
                 sender: "client",
-                created_at: new Date(),
+                created_at: new Date().toISOString(),
               },
             ]);
             await window.supabaseClient
@@ -1001,7 +1010,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   especialista_id: null,
                   text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
                   sender: "client",
-                  created_at: new Date(),
+                  created_at: new Date().toISOString(),
                 },
               ]);
               await window.supabaseClient
