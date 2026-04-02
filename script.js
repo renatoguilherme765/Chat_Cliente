@@ -213,19 +213,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Recuperar ou gerar um client_id único para a sessão
-  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  // 1. Gerar um novo client_id único para cada sessão (atualização de página)
+  let clientId = crypto.randomUUID();
+  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
   let isReturningClient = false;
   
-  if (clientId) {
-    isReturningClient = true;
-  } else {
-    clientId = crypto.randomUUID();
-    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  }
-  
-  // 2. Garantir que a área de chat comece vazia apenas se não for um cliente retornando
-  if (chatArea && !isReturningClient) {
+  // 2. Garantir que a área de chat comece vazia
+  if (chatArea) {
     chatArea.innerHTML = "";
   }
 
