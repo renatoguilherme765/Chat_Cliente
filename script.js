@@ -290,18 +290,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient || isInsertingMessage) return;
+    if (!window.supabaseClient) {
+      console.error("Supabase client não inicializado.");
+      return;
+    }
+
+    // Garantir que o cliente exista antes de salvar
+    await createClientIfNotExists();
+
+    if (!clientId) {
+      console.error("clientId está nulo, não é possível salvar mensagem.");
+      return;
+    }
+
+    if (isInsertingMessage) {
+      console.warn("Operação de inserção já em andamento, aguardando...");
+      return;
+    }
+    
     isInsertingMessage = true;
 
     try {
-      await createClientIfNotExists();
-
       let sender = type === "user" ? "client" : (type === "bot" ? "bot" : "system");
       let messageText = text || htmlContent;
 
       localMessages.add(messageText);
 
-      // Inserção simplificada para evitar erro 400 (Bad Request)
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
@@ -313,11 +327,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (error) {
         console.error("Erro do Supabase ao inserir mensagem:", error);
-      } else if (msgDiv && msgDiv._statusSpan) {
-        // Ícone de check (enviado)
-        msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
-        msgDiv._statusSpan.style.opacity = "1";
-        msgDiv._statusSpan.title = "Enviada";
+      } else {
+        console.log("Mensagem gravada no Supabase com sucesso");
+        if (msgDiv && msgDiv._statusSpan) {
+          // Ícone de check (enviado)
+          msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+          msgDiv._statusSpan.style.opacity = "1";
+          msgDiv._statusSpan.title = "Enviada";
+        }
       }
     } catch (err) {
       console.error("Erro ao salvar mensagem no Supabase:", err);
