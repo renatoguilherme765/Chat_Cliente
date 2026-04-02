@@ -335,7 +335,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       let sender = type === "user" ? "client" : (type === "bot" ? "bot" : "system");
       let messageText = text || htmlContent;
-
+      
+      // Se for HTML, garantimos que o texto salvo seja o próprio HTML para ser renderizado corretamente depois
+      if (htmlContent && !text) {
+        messageText = htmlContent;
+      }
+      
       localMessages.add(messageText);
 
       const payload = {
