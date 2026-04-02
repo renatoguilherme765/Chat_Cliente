@@ -596,8 +596,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     `;
         }
       } else {
-        if (type === "system") {
-          contentDiv.innerHTML = text;
+        // Se for mensagem do sistema, ou se o texto parecer HTML, renderizamos como HTML
+        // Se for mensagem do usuário, renderizamos como texto puro para evitar XSS
+        if (type === "system" || (htmlContent && !text) || (text && text.trim().startsWith('<') && text.trim().endsWith('>'))) {
+          contentDiv.innerHTML = htmlContent || text;
         } else {
           contentDiv.textContent = text;
         }
