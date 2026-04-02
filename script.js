@@ -1034,7 +1034,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     isSending = true;
     userInput.value = ""; // Clear immediately
 
-    addMessage(text, "user");
+    addMessage(text, "user", null, true);
 
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
