@@ -1,3 +1,5 @@
+window.onbeforeunload = () => { sessionStorage.clear(); };
+
 document.addEventListener("DOMContentLoaded", async () => {
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
@@ -1035,6 +1037,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     userInput.value = ""; // Clear immediately
 
     addMessage(text, "user", null, true);
+
+    if (window.supabaseClient) {
+      await window.supabaseClient.from('chat_messages').insert([{ client_id: clientId, text: text, sender: 'client' }]);
+    }
 
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
