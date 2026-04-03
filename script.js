@@ -1,6 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+
 document.addEventListener("DOMContentLoaded", async () => {
+  const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+  window.supabaseClient = supabase;
+  
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
+
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Network response was not ok");
