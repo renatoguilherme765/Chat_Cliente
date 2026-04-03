@@ -1080,9 +1080,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  sendBtn.addEventListener("click", handleSend);
-  userInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") handleSend();
+  sendBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    handleSend();
+  });
+  userInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSend();
+    }
   });
 
   initChat();
