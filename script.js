@@ -1,5 +1,3 @@
-window.onbeforeunload = () => { sessionStorage.clear(); };
-
 document.addEventListener("DOMContentLoaded", async () => {
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
@@ -215,20 +213,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Gerar um novo client_id único para cada sessão (atualização de página)
-  let clientId = crypto.randomUUID();
-  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  let isReturningClient = false;
+  // 1. Recuperar ou gerar client_id persistente
+  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  }
+  
+  // Resetar estado do bot no refresh (sessionStorage)
+  sessionStorage.removeItem('currentStep');
+  sessionStorage.removeItem('isLiveChat');
   
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
     chatArea.innerHTML = "";
   }
-
+  
+  let isReturningClient = false; // Forçar reinício do fluxo do bot
   const localMessages = new Set();
   let clientEnsured = false;
 
-  // 3. Criar cliente na tabela chat_clients
+  // 3. Criar cliente na tabela chat_clients (se não existir)
   let clientCreated = false;
   let createClientPromise = null;
 
@@ -349,7 +354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         payload.especialista_id = currentSpecialistId;
       }
 
-      console.log(`Enviando insert para Supabase: clientId=${clientId}, sender=${sender}`);
+      console.log(`Enviando insert para Supabase: clientId=${clientId}, tenantId=${tenantId}, sender=${sender}, text=${messageText}`);
       const { error } = await window.supabaseClient.from("chat_messages").insert([payload]);
 
       if (error) {
@@ -1036,128 +1041,73 @@ document.addEventListener("DOMContentLoaded", async () => {
     isSending = true;
     userInput.value = ""; // Clear immediately
 
-    addMessage(text, "user", null, true);
+    // 1. Gravar no Supabase (forçado)
+    const clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+    const { error } = await window.supabaseClient.from('chat_messages').insert([{ 
+      client_id: clientId, 
+      text: text, 
+      sender: 'client',
+      created_at: new Date().toISOString()
+    }]);
+    if (error) console.error("Erro ao gravar mensagem manual:", error);
 
-    if (window.supabaseClient) {
-      await window.supabaseClient.from('chat_messages').insert([{ client_id: clientId, text: text, sender: 'client' }]);
-    }
+    // 2. Adicionar à UI
+    addMessage(text, "user", null, false);
 
-    if (isLiveChat) {
-      // Se estiver no chat ao vivo, o bot não responde mais,
-      // a mensagem já foi salva pelo addMessage acima
-      isSending = false;
-      return;
-    }
-
-    if (currentStep === "cpf" || currentStep === "cpf_whatsapp") {
-      const cleanCPF = text.replace(/\D/g, "");
-      if (cleanCPF.length >= 11) {
-        const isCNPJ = cleanCPF.length >= 14;
-        const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
-
-        setTimeout(() => {
-          addMessage(confirmMsg, "bot");
+    // 3. Processar fluxo do bot (se não estiver em live chat)
+    if (!isLiveChat) {
+      if (currentStep === "cpf" || currentStep === "cpf_whatsapp") {
+        const cleanCPF = text.replace(/\D/g, "");
+        if (cleanCPF.length >= 11) {
+          const isCNPJ = cleanCPF.length >= 14;
+          const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
 
           setTimeout(() => {
-            addMessage("Agora, por favor, digite seu primeiro NOME.", "bot");
-            currentStep =
-              currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
-            isSending = false;
-          }, 800);
-        }, 800);
-      } else {
-        setTimeout(() => {
-          if (currentStep === "cpf_whatsapp") {
-            addMessage(
-              "CPF/CNPJ inválido. Por favor, digite apenas números.",
-              "bot",
-            );
-          } else {
-            addMessage(
-              "CPF inválido. Por favor, digite os 11 números do seu CPF.",
-              "bot",
-            );
-          }
-          isSending = false;
-        }, 800);
-      }
-    } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
-      userName = text.trim();
-      if (userName.length >= 2) {
-        // Atualiza o nome do cliente no Supabase sem bloquear o fluxo
-        if (window.supabaseClient) {
-          window.supabaseClient
-            .from("chat_clients")
-            .update({
-              name: userName,
-            })
-            .eq("id", clientId)
-            .then();
-        }
+            addMessage(confirmMsg, "bot");
 
-        if (currentStep === "nome_whatsapp") {
-          setTimeout(async () => {
-            const msg = `Obrigado. Você está sendo conectado a um especialista.`;
-            addMessage(null, "bot", msg);
-            currentStep = "nome_recebido";
-            isLiveChat = true;
-
-            if (window.supabaseClient) {
-              await createClientIfNotExists();
-              await window.supabaseClient
-                .from("chat_clients")
-                .update({ status: "em_atendimento" })
-                .eq("id", clientId);
-            }
-            isSending = false;
+            setTimeout(() => {
+              addMessage("Agora, por favor, digite seu primeiro NOME.", "bot");
+              currentStep =
+                currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
+              isSending = false;
+            }, 800);
           }, 800);
         } else {
           setTimeout(() => {
             addMessage(
-              `Obrigado, ${userName}! Consultando condições disponíveis...`,
+              "CPF/CNPJ inválido. Por favor, digite apenas números.",
               "bot",
             );
-
-            setTimeout(() => {
-              const options = `
-                                <p>Opções disponíveis:</p>
-                                <div class="btn-container">
-                                    <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
-                                    <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
-                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
-                                    <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
-                                </div>
-                            `;
-              addMessage(null, "bot", options);
-              currentStep = "nome_recebido";
-              isSending = false;
-            }, 1500);
+            isSending = false;
           }, 800);
         }
-      } else {
-        setTimeout(() => {
-          addMessage("Por favor, digite um nome válido.", "bot");
-          isSending = false;
-        }, 800);
-      }
-    } else if (currentStep === "nome_recebido") {
-      const option = text.trim();
-      if (option === "1") {
-        handleAction("pagamento_total");
-      } else if (option === "2") {
-        handleAction("renegociacao_carencia");
-      } else if (option === "3") {
-        handleAction("entrega_amigavel");
-      } else if (option === "4") {
-        handleAction("falar_especialista");
-      } else {
+      } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
+        userName = text;
+        addMessage(`Olá ${userName}!`, "bot");
         setTimeout(() => {
           addMessage(
-            "Por favor, escolha uma das opções acima clicando nos botões ou digitando o número correspondente (1, 2, 3 ou 4).",
+            "Estamos consultando sua proposta. Aguarde um instante...",
             "bot",
           );
+          setTimeout(() => {
+            addMessage(
+              "Encontramos uma condição especial para você! Gostaria de ver as condições?",
+              "bot",
+            );
+            const cardHtml = `
+              <div class="btn-container">
+                  <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
+              </div>
+            `;
+            addMessage(null, "bot", cardHtml);
+            currentStep = "condicoes";
+            isSending = false;
+          }, 1500);
         }, 800);
+      } else {
+        isSending = false;
       }
+    } else {
       isSending = false;
     }
   }
