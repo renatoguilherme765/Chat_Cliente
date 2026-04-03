@@ -1,5 +1,3 @@
-window.onbeforeunload = () => { sessionStorage.clear(); };
-
 document.addEventListener("DOMContentLoaded", async () => {
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
@@ -206,8 +204,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentStep = "start";
   let isLiveChat = false;
   let userName = "";
-  let isSending = false;
-  let currentSpecialistId = null;
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -215,14 +211,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Recuperar ou gerar um novo client_id único para cada sessão
+  // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
   let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  let isReturningClient = !!clientId;
+  
   if (!clientId) {
     clientId = crypto.randomUUID();
     localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
   }
-  let isReturningClient = false;
-  
+
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
     chatArea.innerHTML = "";
@@ -240,69 +237,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!createClientPromise) {
       createClientPromise = (async () => {
-        try {
-          const { data, error: selectError } = await window.supabaseClient
-            .from("chat_clients")
-            .select("id")
-            .eq("id", clientId)
-            .eq("tenant_id", tenantId);
+        const { data } = await window.supabaseClient
+          .from("chat_clients")
+          .select("id")
+          .eq("id", clientId)
+          .eq("tenant_id", tenantId);
 
-          if (selectError) {
-            console.error("Erro ao buscar cliente:", selectError);
+        if (!data || data.length === 0) {
+          const insertData = {
+            id: clientId,
+            name: "Cliente",
+            status: "bot",
+            tenant_id: tenantId,
+          };
+
+          if (telefoneCliente) {
+            insertData.telefone = telefoneCliente;
           }
 
-          if (!data || data.length === 0) {
-            const insertData = {
-              id: clientId,
-              name: "Cliente",
-              status: "bot",
-              tenant_id: tenantId,
-            };
-
-            if (telefoneCliente) {
-              insertData.telefone = telefoneCliente;
-            }
-
-            const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
-            if (insertError) {
-              console.error("Erro ao criar cliente:", insertError);
-            }
-          } else {
-            // Se o cliente já existe, buscar especialista atribuído
-            const { data: clientData, error: clientError } = await window.supabaseClient
-              .from("chat_clients")
-              .select("especialista_id")
-              .eq("id", clientId)
-              .single();
-            
-            if (clientError) {
-              console.error("Erro ao buscar especialista do cliente:", clientError);
-            }
-            
-            if (clientData && clientData.especialista_id) {
-              currentSpecialistId = clientData.especialista_id;
-              const { data: specialistData, error: specialistError } = await window.supabaseClient
-                .from("specialists")
-                .select("name")
-                .eq("id", currentSpecialistId)
-                .single();
-              
-              if (specialistError) {
-                console.error("Erro ao buscar nome do especialista:", specialistError);
-              }
-              
-              if (specialistData) {
-                const headerTitle = document.querySelector(".header-title h1");
-                if (headerTitle) {
-                  headerTitle.textContent = `Falando com: ${specialistData.name}`;
-                }
-              }
-            }
-          }
-          clientCreated = true;
-        } catch (err) {
-          console.error("Exceção em createClientIfNotExists:", err);
+          await window.supabaseClient.from("chat_clients").insert([insertData]);
         }
+        clientCreated = true;
       })();
     }
     await createClientPromise;
@@ -313,99 +268,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    console.log(`Iniciando saveMessageToSupabase para: "${text || 'html'}"`);
-    if (!window.supabaseClient) {
-      console.error("Supabase client não inicializado.");
-      return;
-    }
-
-    // Garantir que o cliente exista antes de salvar
+    if (!window.supabaseClient) return;
     await createClientIfNotExists();
 
-    if (!clientId) {
-      // Tenta recuperar do localStorage como fallback
-      clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
-      if (!clientId) {
-        console.error("clientId está nulo, não é possível salvar mensagem.");
-        return;
-      }
-    }
+    let sender = type === "user" ? "cliente" : "system";
+    let messageText = text || htmlContent;
+
+    localMessages.add(messageText);
 
     try {
-      let sender = type === "user" ? "client" : (type === "bot" ? "bot" : "system");
-      let messageText = text || htmlContent;
-      
-      // Se for HTML, garantimos que o texto salvo seja o próprio HTML para ser renderizado corretamente depois
-      if (htmlContent && !text) {
-        messageText = htmlContent;
-      }
-      
-      localMessages.add(messageText);
-
-      const payload = {
-        client_id: clientId,
-        text: messageText,
-        sender: sender,
-        tenant_id: tenantId,
-        created_at: new Date().toISOString()
-      };
-      if (currentSpecialistId) {
-        payload.especialista_id = currentSpecialistId;
-      }
-
-      console.log(`Enviando insert para Supabase: clientId=${clientId}, sender=${sender}`);
-      const { error } = await window.supabaseClient.from("chat_messages").insert([payload]);
+      // Inserção simplificada para evitar erro 400 (Bad Request)
+      // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
+      const { error } = await window.supabaseClient.from("chat_messages").insert([
+        {
+          client_id: clientId,
+          text: messageText,
+          sender: sender === 'cliente' ? 'client' : 'system'
+        },
+      ]);
 
       if (error) {
-        console.error("FALHA CRÍTICA AO GRAVAR NO BANCO:", error);
-      } else {
-        console.log("Mensagem gravada no Supabase com sucesso");
-        if (msgDiv && msgDiv._statusSpan) {
-          // Ícone de check (enviado)
-          msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
-          msgDiv._statusSpan.style.opacity = "1";
-          msgDiv._statusSpan.title = "Enviada";
-        }
+        console.error("Erro do Supabase ao inserir mensagem:", error);
+      } else if (msgDiv && msgDiv._statusSpan) {
+        // Ícone de check (enviado)
+        msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+        msgDiv._statusSpan.style.opacity = "1";
+        msgDiv._statusSpan.title = "Enviada";
       }
     } catch (err) {
-      console.error("FALHA CRÍTICA AO GRAVAR NO BANCO (Exception):", err);
+      console.error("Erro ao salvar mensagem no Supabase:", err);
     }
   }
 
   // 5. Escutar mensagens em tempo real
   if (window.supabaseClient) {
-    window.supabaseClient
-      .channel(`chat_clients_${clientId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chat_clients",
-          filter: `id=eq.${clientId}`,
-        },
-        async (payload) => {
-          if (payload.new.especialista_id && payload.new.especialista_id !== currentSpecialistId) {
-            currentSpecialistId = payload.new.especialista_id;
-            
-            // Buscar nome do especialista
-            const { data: specialistData } = await window.supabaseClient
-              .from("specialists")
-              .select("name")
-              .eq("id", currentSpecialistId)
-              .single();
-            
-            if (specialistData) {
-              const headerTitle = document.querySelector(".header-title h1");
-              if (headerTitle) {
-                headerTitle.textContent = `Falando com: ${specialistData.name}`;
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
-
     window.supabaseClient
       .channel(`chat_messages_${clientId}`)
       .on(
@@ -417,7 +313,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          if (payload.new.sender === "specialist" || payload.new.sender === "system" || payload.new.sender === "bot") {
+          if (payload.new.sender === "specialist" || payload.new.sender === "system") {
             // Evita duplicar mensagens que o próprio sistema local enviou
             if (!localMessages.has(payload.new.text)) {
               let parsed;
@@ -504,7 +400,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               } else {
                 addMessage(
                   payload.new.text,
-                  payload.new.sender === "bot" ? "bot" : "system",
+                  "system",
                   null,
                   false,
                   payload.new.created_at,
@@ -525,13 +421,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     save = true,
     createdAt = null,
   ) {
-    console.log(`addMessage chamado: text="${text || 'html'}", type=${type}, save=${save}`);
     const msgDiv = document.createElement("div");
     if (!htmlContent || !htmlContent.includes("pdf-clean")) {
       msgDiv.classList.add("message");
-      msgDiv.classList.add(type === "user" ? "user-msg" : "system-msg");
+      msgDiv.classList.add(type === "system" ? "system-msg" : "user-msg");
     } else {
-      msgDiv.style.alignSelf = type === "user" ? "flex-end" : "flex-start";
+      msgDiv.style.alignSelf = type === "system" ? "flex-start" : "flex-end";
       msgDiv.style.animation =
         "fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
       msgDiv.style.margin = "4px 0";
@@ -602,10 +497,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     `;
         }
       } else {
-        // Se for mensagem do sistema, ou se o texto parecer HTML, renderizamos como HTML
-        // Se for mensagem do usuário, renderizamos como texto puro para evitar XSS
-        if (type === "system" || (htmlContent && !text) || (text && text.trim().startsWith('<') && text.trim().endsWith('>'))) {
-          contentDiv.innerHTML = htmlContent || text;
+        if (type === "system") {
+          contentDiv.innerHTML = text;
         } else {
           contentDiv.textContent = text;
         }
@@ -653,10 +546,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     chatArea.scrollTop = chatArea.scrollHeight;
 
     if (save) {
-      console.log(`Chamando saveMessageToSupabase para mensagem: "${text || 'html'}", type: ${type}`);
       saveMessageToSupabase(text, type, htmlContent, msgDiv);
-    } else {
-      console.log(`NÃO salvando mensagem (save=false): "${text || 'html'}", type: ${type}`);
     }
   }
 
@@ -668,29 +558,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       .from("chat_messages")
       .select("*")
       .eq("client_id", clientId)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: true });
 
     if (messages && messages.length > 0) {
       messages.forEach((msg) => {
         // Não mostra a mensagem oculta de solicitação de boleto para o cliente
         if (
-          msg.text ===
+          msg.content ===
           "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto."
         )
           return;
         if (
-          msg.text ===
+          msg.content ===
           "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições."
         )
           return;
 
-        const type = msg.sender === "client" ? "user" : (msg.sender === "bot" ? "bot" : "system");
+        const type = msg.sender_type === "cliente" ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
         let parsed;
 
         try {
           parsed =
-            typeof msg.text === "string" ? JSON.parse(msg.text) : msg.text;
+            typeof msg.content === "string" ? JSON.parse(msg.content) : msg.content;
         } catch {
           parsed = null;
         }
@@ -754,7 +645,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage(null, type, fileHtml, false, msg.created_at);
           }
         } else {
-          addMessage(msg.text, type, null, false, msg.created_at);
+          addMessage(msg.content, type, null, false, msg.created_at);
         }
       });
 
@@ -763,6 +654,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         .from("chat_clients")
         .select("status")
         .eq("id", clientId)
+        .eq("tenant_id", tenantId)
         .single();
 
       if (
@@ -780,8 +672,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const reversedMessages = [...messages].reverse();
         for (const msg of reversedMessages) {
-          if (msg.sender === "specialist" || msg.sender === "system" || msg.sender === "bot") {
-            const text = msg.text || "";
+          if (msg.sender_type === "especialista" || msg.sender_type === "system") {
+            const text = msg.content || "";
             if (
               text.includes("Gerando boleto") ||
               text.includes("conectado a um especialista")
@@ -858,7 +750,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         const msg =
           "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
-        addMessage(null, "bot", msg);
+        addMessage(null, "system", msg);
         currentStep = "cpf_whatsapp";
       }, 500);
     } else {
@@ -866,7 +758,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Olá 👋 Identificamos uma condição especial para regularização do seu contrato.",
-          "bot",
+          "system",
         );
 
         setTimeout(() => {
@@ -880,7 +772,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             </div>
                         </div>
                     `;
-          addMessage(null, "bot", cardHtml);
+          addMessage(null, "system", cardHtml);
         }, 1000);
       }, 500);
     }
@@ -894,7 +786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Por favor, informe seu CPF ou CNPJ para consultarmos seu contrato.",
-          "bot",
+          "system",
         );
       }, 800);
     } else if (action === "pagamento_total") {
@@ -902,7 +794,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Aguarde um instante, estamos analisando a melhor condição para o seu contrato.",
-          "bot",
+          "system",
         );
         setTimeout(() => {
           const content = `
@@ -916,7 +808,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">Falar com especialista</button>
                         </div>
                     `;
-          addMessage(null, "bot", content);
+          addMessage(null, "system", content);
         }, 1500);
       }, 800);
     } else if (action === "renegociacao_carencia") {
@@ -924,10 +816,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Estamos analisando a proposta de renegociação com carência de até 90 dias. Aguarde um instante enquanto verificamos as condições disponíveis.",
-          "bot",
+          "system",
         );
         setTimeout(async () => {
-          addMessage("Você será redirecionado para um especialista.", "bot");
+          addMessage("Você será redirecionado para um especialista.", "system");
           isLiveChat = true;
 
           if (window.supabaseClient) {
@@ -938,7 +830,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 especialista_id: null,
                 text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
                 sender: "client",
-                created_at: new Date().toISOString(),
+                created_at: new Date(),
               },
             ]);
             await window.supabaseClient
@@ -953,14 +845,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         const msg =
           "A entrega amigável é quitativa, ou seja, quitação Total do financiamento.<br><br>Caso existam débitos no DETRAN, iremos regularizar e retirar essas pendências.<br><br>Após a conclusão, você poderá verificar a possibilidade de financiar outro veículo com parcelas que caibam no seu bolso.<br><br>Todas as informações estão sujeitas à análise.";
-        addMessage(null, "bot", msg);
+        addMessage(null, "system", msg);
         setTimeout(() => {
           const btn = `
                         <div class="btn-container">
                             <button class="chat-btn" onclick="handleAction('falar_especialista')">Falar com especialista</button>
                         </div>
                     `;
-          addMessage(null, "bot", btn);
+          addMessage(null, "system", btn);
         }, 1500);
       }, 800);
     } else if (action === "falar_especialista") {
@@ -968,7 +860,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(async () => {
         addMessage(
           "Aguarde um instante, você será conectado a um especialista.",
-          "bot",
+          "system",
         );
         isLiveChat = true;
 
@@ -986,7 +878,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         addMessage(
           "Só um instante, estamos gerando o boleto com os descontos, mostraremos o valor de pagamento e vencimento do boleto.",
-          "bot",
+          "system",
         );
         setTimeout(() => {
           const content = `
@@ -1004,7 +896,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             <p style="margin-top: 12px; font-size: 13px; color: #666; font-weight: 500;">Gerando boleto...</p>
                         </div>
                     `;
-          addMessage(null, "bot", content);
+          addMessage(null, "system", content);
 
           setTimeout(async () => {
             isLiveChat = true;
@@ -1017,7 +909,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   especialista_id: null,
                   text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
                   sender: "client",
-                  created_at: new Date().toISOString(),
+                  created_at: new Date(),
                 },
               ]);
               await window.supabaseClient
@@ -1033,19 +925,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Lógica de Envio de Mensagem
   async function handleSend() {
-    if (isSending) return;
     const text = userInput.value.trim();
     if (!text) return;
 
-    isSending = true;
-    userInput.value = ""; // Clear immediately
-
-    addMessage(text, "user", null, true);
+    addMessage(text, "user");
+    userInput.value = "";
 
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
-      // a mensagem já foi salva pelo addMessage acima
-      isSending = false;
+      // apenas salva a mensagem para o especialista ver
+      await saveMessageToSupabase(text, "user");
       return;
     }
 
@@ -1056,13 +945,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
 
         setTimeout(() => {
-          addMessage(confirmMsg, "bot");
+          addMessage(confirmMsg, "system");
 
           setTimeout(() => {
-            addMessage("Agora, por favor, digite seu primeiro NOME.", "bot");
+            addMessage("Agora, por favor, digite seu primeiro NOME.", "system");
             currentStep =
               currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
-            isSending = false;
           }, 800);
         }, 800);
       } else {
@@ -1070,15 +958,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (currentStep === "cpf_whatsapp") {
             addMessage(
               "CPF/CNPJ inválido. Por favor, digite apenas números.",
-              "bot",
+              "system",
             );
           } else {
             addMessage(
               "CPF inválido. Por favor, digite os 11 números do seu CPF.",
-              "bot",
+              "system",
             );
           }
-          isSending = false;
         }, 800);
       }
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
@@ -1098,7 +985,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (currentStep === "nome_whatsapp") {
           setTimeout(async () => {
             const msg = `Obrigado. Você está sendo conectado a um especialista.`;
-            addMessage(null, "bot", msg);
+            addMessage(null, "system", msg);
             currentStep = "nome_recebido";
             isLiveChat = true;
 
@@ -1109,13 +996,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 .update({ status: "em_atendimento" })
                 .eq("id", clientId);
             }
-            isSending = false;
           }, 800);
         } else {
           setTimeout(() => {
             addMessage(
               `Obrigado, ${userName}! Consultando condições disponíveis...`,
-              "bot",
+              "system",
             );
 
             setTimeout(() => {
@@ -1128,16 +1014,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                                     <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                                 </div>
                             `;
-              addMessage(null, "bot", options);
+              addMessage(null, "system", options);
               currentStep = "nome_recebido";
-              isSending = false;
             }, 1500);
           }, 800);
         }
       } else {
         setTimeout(() => {
-          addMessage("Por favor, digite um nome válido.", "bot");
-          isSending = false;
+          addMessage("Por favor, digite um nome válido.", "system");
         }, 800);
       }
     } else if (currentStep === "nome_recebido") {
@@ -1154,11 +1038,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         setTimeout(() => {
           addMessage(
             "Por favor, escolha uma das opções acima clicando nos botões ou digitando o número correspondente (1, 2, 3 ou 4).",
-            "bot",
+            "system",
           );
         }, 800);
       }
-      isSending = false;
     }
   }
 
@@ -1200,10 +1083,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   sendBtn.addEventListener("click", handleSend);
   userInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === "Enter") handleSend();
   });
 
   initChat();
