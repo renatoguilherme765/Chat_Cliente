@@ -221,8 +221,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   
   // Resetar estado do bot no refresh (sessionStorage)
-  sessionStorage.removeItem('currentStep');
-  sessionStorage.removeItem('isLiveChat');
+  sessionStorage.removeItem('bot_step');
   
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
@@ -1074,10 +1073,17 @@ document.addEventListener("DOMContentLoaded", async () => {
           }, 800);
         } else {
           setTimeout(() => {
-            addMessage(
-              "CPF/CNPJ inválido. Por favor, digite apenas números.",
-              "bot",
-            );
+            if (currentStep === "cpf_whatsapp") {
+              addMessage(
+                "CPF/CNPJ inválido. Por favor, digite apenas números.",
+                "bot",
+              );
+            } else {
+              addMessage(
+                "CPF inválido. Por favor, digite os 11 números do seu CPF.",
+                "bot",
+              );
+            }
             isSending = false;
           }, 800);
         }
