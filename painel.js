@@ -162,7 +162,12 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    div.innerHTML = msg.text;
+                    // Se o texto parecer HTML, renderizamos como HTML, senão como texto puro
+                    if (msg.text.trim().startsWith('<') && msg.text.trim().endsWith('>')) {
+                        div.innerHTML = msg.text;
+                    } else {
+                        div.textContent = msg.text;
+                    }
                 }
                 
                 chatMessages.appendChild(div);
