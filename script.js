@@ -215,9 +215,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Gerar um novo client_id único para cada sessão (atualização de página)
-  let clientId = crypto.randomUUID();
-  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  // 1. Recuperar ou gerar um novo client_id único para cada sessão
+  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  if (!clientId) {
+    clientId = crypto.randomUUID();
+    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+  }
   let isReturningClient = false;
   
   // 2. Garantir que a área de chat comece vazia
@@ -343,6 +346,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         client_id: clientId,
         text: messageText,
         sender: sender,
+        tenant_id: tenantId,
         created_at: new Date().toISOString()
       };
       if (currentSpecialistId) {
@@ -1037,10 +1041,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     userInput.value = ""; // Clear immediately
 
     addMessage(text, "user", null, true);
-
-    if (window.supabaseClient) {
-      await window.supabaseClient.from('chat_messages').insert([{ client_id: clientId, text: text, sender: 'client' }]);
-    }
 
     if (isLiveChat) {
       // Se estiver no chat ao vivo, o bot não responde mais,
