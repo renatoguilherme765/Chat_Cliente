@@ -352,7 +352,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         payload.especialista_id = currentSpecialistId;
       }
 
-      console.log(`Enviando insert para Supabase: clientId=${clientId}, sender=${sender}`);
+      console.log(`Enviando insert para Supabase: clientId=${clientId}, tenantId=${tenantId}, sender=${sender}, text=${messageText}`);
       const { error } = await window.supabaseClient.from("chat_messages").insert([payload]);
 
       if (error) {
@@ -1039,11 +1039,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     isSending = true;
     userInput.value = ""; // Clear immediately
 
-    addMessage(text, "user", null, true);
+    // Save manually to ensure persistence
+    await saveMessageToSupabase(text, "user", null);
+    
+    // Add to UI without saving again
+    addMessage(text, "user", null, false);
 
     if (isLiveChat) {
-      // Se estiver no chat ao vivo, o bot não responde mais,
-      // a mensagem já foi salva pelo addMessage acima
+      // Se estiver no chat ao vivo, o bot não responde mais
       isSending = false;
       return;
     }
