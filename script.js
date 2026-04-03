@@ -213,17 +213,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // 1. Recuperar ou gerar client_id persistente
-  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  // 1. Gerar um novo client_id único para cada sessão (atualização de página)
+  let clientId = crypto.randomUUID();
+  localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
   let isReturningClient = false;
-  if (clientId) {
-    isReturningClient = true;
-  } else {
-    clientId = crypto.randomUUID();
-    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  }
   
-  // 2. Garantir que a área de chat comece vazia (opcional: se quiser manter histórico, remover esta linha)
+  // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
     chatArea.innerHTML = "";
   }
@@ -231,7 +226,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const localMessages = new Set();
   let clientEnsured = false;
 
-  // 3. Criar cliente na tabela chat_clients (se não existir)
+  // 3. Criar cliente na tabela chat_clients
   let clientCreated = false;
   let createClientPromise = null;
 
@@ -352,7 +347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         payload.especialista_id = currentSpecialistId;
       }
 
-      console.log(`Enviando insert para Supabase: clientId=${clientId}, tenantId=${tenantId}, sender=${sender}, text=${messageText}`);
+      console.log(`Enviando insert para Supabase: clientId=${clientId}, sender=${sender}`);
       const { error } = await window.supabaseClient.from("chat_messages").insert([payload]);
 
       if (error) {
@@ -1039,14 +1034,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     isSending = true;
     userInput.value = ""; // Clear immediately
 
-    // Save manually to ensure persistence
-    await saveMessageToSupabase(text, "user", null);
-    
-    // Add to UI without saving again
-    addMessage(text, "user", null, false);
+    addMessage(text, "user", null, true);
 
     if (isLiveChat) {
-      // Se estiver no chat ao vivo, o bot não responde mais
+      // Se estiver no chat ao vivo, o bot não responde mais,
+      // a mensagem já foi salva pelo addMessage acima
       isSending = false;
       return;
     }
