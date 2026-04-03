@@ -1097,22 +1097,45 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
           setTimeout(() => {
             addMessage(
-              "Encontramos uma condição especial para você! Gostaria de ver as condições?",
+              "Encontramos uma condição especial para você! Escolha uma das opções abaixo:",
               "bot",
             );
-            const cardHtml = `
-              <div class="btn-container">
-                  <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
-              </div>
-            `;
-            addMessage(null, "bot", cardHtml);
-            currentStep = "condicoes";
+            const options = `
+                                <p>Opções disponíveis:</p>
+                                <div class="btn-container">
+                                    <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                    <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
+                                    <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
+                                </div>
+                            `;
+            addMessage(null, "bot", options);
+            currentStep = "nome_recebido";
             isSending = false;
           }, 1500);
         }, 800);
       } else {
         isSending = false;
       }
+    } else if (currentStep === "nome_recebido") {
+      const option = text.trim();
+      if (option === "1") {
+        handleAction("pagamento_total");
+      } else if (option === "2") {
+        handleAction("renegociacao_carencia");
+      } else if (option === "3") {
+        handleAction("entrega_amigavel");
+      } else if (option === "4") {
+        handleAction("falar_especialista");
+      } else {
+        setTimeout(() => {
+          addMessage(
+            "Por favor, escolha uma das opções acima clicando nos botões ou digitando o número correspondente (1, 2, 3 ou 4).",
+            "bot",
+          );
+        }, 800);
+      }
+      isSending = false;
     } else {
       isSending = false;
     }
