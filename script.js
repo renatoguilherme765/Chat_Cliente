@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Lógica de Slug Dinâmico
   const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
-  let tenantId = null;
+  let tenantId = localStorage.getItem("tenant_id") || null;
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -269,21 +269,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
     if (!window.supabaseClient) return;
+    if (!clientId || !tenantId) return;
     await createClientIfNotExists();
 
-    let sender = type === "user" ? "cliente" : "system";
+    let sender = type === "user" ? "client" : "system";
     let messageText = text || htmlContent;
 
     localMessages.add(messageText);
 
     try {
-      // Inserção simplificada para evitar erro 400 (Bad Request)
-      // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
+          tenant_id: tenantId,
           text: messageText,
-          sender: sender === 'cliente' ? 'client' : 'system'
+          sender: sender
         },
       ]);
 
@@ -563,25 +563,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (messages && messages.length > 0) {
       messages.forEach((msg) => {
+        const messageText = msg.text || msg.content;
         // Não mostra a mensagem oculta de solicitação de boleto para o cliente
         if (
-          msg.content ===
+          messageText ===
           "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto."
         )
           return;
         if (
-          msg.content ===
+          messageText ===
           "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições."
         )
           return;
 
-        const type = msg.sender_type === "cliente" ? "user" : "system";
+        const type = (msg.sender === "client" || msg.sender_type === "cliente") ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
         let parsed;
 
         try {
           parsed =
-            typeof msg.content === "string" ? JSON.parse(msg.content) : msg.content;
+            typeof messageText === "string" ? JSON.parse(messageText) : messageText;
         } catch {
           parsed = null;
         }
@@ -645,7 +646,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage(null, type, fileHtml, false, msg.created_at);
           }
         } else {
-          addMessage(msg.content, type, null, false, msg.created_at);
+          addMessage(messageText, type, null, false, msg.created_at);
         }
       });
 
@@ -672,8 +673,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const reversedMessages = [...messages].reverse();
         for (const msg of reversedMessages) {
-          if (msg.sender_type === "especialista" || msg.sender_type === "system") {
-            const text = msg.content || "";
+          if (msg.sender === "system" || msg.sender_type === "especialista" || msg.sender_type === "system") {
+            const text = msg.text || msg.content || "";
             if (
               text.includes("Gerando boleto") ||
               text.includes("conectado a um especialista")
@@ -824,15 +825,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           if (window.supabaseClient) {
             await createClientIfNotExists();
-            await window.supabaseClient.from("chat_messages").insert([
-              {
-                client_id: clientId,
-                especialista_id: null,
-                text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                sender: "client",
-                created_at: new Date(),
-              },
-            ]);
+              await window.supabaseClient.from("chat_messages").insert([
+                {
+                  client_id: clientId,
+                  tenant_id: tenantId,
+                  especialista_id: null,
+                  text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                  sender: "client",
+                  created_at: new Date(),
+                },
+              ]);
             await window.supabaseClient
               .from("chat_clients")
               .update({ status: "aguardando" })
@@ -906,6 +908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               await window.supabaseClient.from("chat_messages").insert([
                 {
                   client_id: clientId,
+                  tenant_id: tenantId,
                   especialista_id: null,
                   text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
                   sender: "client",
@@ -1080,15 +1083,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  sendBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    handleSend();
-  });
-  userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSend();
-    }
+  sendBtn.addEventListener("click", handleSend);
+  userInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") handleSend();
   });
 
   initChat();

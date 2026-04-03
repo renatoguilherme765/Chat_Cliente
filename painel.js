@@ -71,6 +71,7 @@ async function renderMessages() {
     if (!activeClientId) return;
 
     const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = '';
 
     if (window.supabaseClient) {
         const { data: messages, error } = await window.supabaseClient
@@ -80,7 +81,6 @@ async function renderMessages() {
             .order('created_at', { ascending: true });
 
         if (messages) {
-            chatMessages.innerHTML = ''; // Clear after await to prevent race condition
             messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
@@ -162,7 +162,12 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    div.innerHTML = msg.text;
+                    // Se o texto parecer HTML, renderizamos como HTML, senão como texto puro
+                    if (msg.text.trim().startsWith('<') && msg.text.trim().endsWith('>')) {
+                        div.innerHTML = msg.text;
+                    } else {
+                        div.textContent = msg.text;
+                    }
                 }
                 
                 chatMessages.appendChild(div);
@@ -172,7 +177,6 @@ async function renderMessages() {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
         let chat = chats[activeClientId];
         if (chat && chat.messages) {
-            chatMessages.innerHTML = ''; // Clear before appending
             chat.messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `message ${msg.type === 'user' ? 'client-msg' : 'agent-msg'}`;
@@ -332,13 +336,14 @@ if (agentFileInput) {
 
         if (data && data.publicUrl) {
             const tenantId = localStorage.getItem('tenant_id');
-        await window.supabaseClient.from('chat_messages').insert({
-            client_id: activeClientId,
-            especialista_id: specialistId,
-            sender: 'system',
-            text: data.publicUrl,
-            created_at: new Date()
-        });
+            await window.supabaseClient.from('chat_messages').insert({
+                client_id: activeClientId,
+                especialista_id: specialistId,
+                tenant_id: tenantId,
+                sender: 'system',
+                text: data.publicUrl,
+                created_at: new Date()
+            });
             await window.supabaseClient.from('chat_clients').update({ 
                 status: 'em_atendimento',
                 especialista_id: specialistId 
@@ -351,19 +356,17 @@ if (agentFileInput) {
 }
 
 // Envio de mensagem pelo agente
-document.getElementById('agentSendBtn').onclick = async (e) => {
-    if (e) e.preventDefault();
+document.getElementById('agentSendBtn').onclick = async () => {
     const input = document.getElementById('agentInput');
     const text = input.value.trim();
     if (!text || !activeClientId) return;
-
-    input.value = ''; // Clear immediately to prevent double send
 
     if (window.supabaseClient) {
         const tenantId = localStorage.getItem('tenant_id');
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
             especialista_id: specialistId,
+            tenant_id: tenantId,
             sender: 'system',
             text: text,
             created_at: new Date()
@@ -384,15 +387,13 @@ document.getElementById('agentSendBtn').onclick = async (e) => {
         }
     }
     
+    input.value = '';
     renderMessages();
 };
 
 // Enviar com Enter
-document.getElementById('agentInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        document.getElementById('agentSendBtn').click();
-    }
+document.getElementById('agentInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') document.getElementById('agentSendBtn').click();
 });
 
 // Inicialização
