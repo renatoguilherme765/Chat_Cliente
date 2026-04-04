@@ -137,8 +137,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // Lógica de Slug Dinâmico
-  const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
-  let tenantId = localStorage.getItem("tenant_id") || "00000000-0000-0000-0000-000000000000"; // FIXAR TENANT_ID (TESTE)
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
+  let tenantId = localStorage.getItem("tenant_id");
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -182,26 +183,20 @@ document.addEventListener("DOMContentLoaded", async () => {
           .ilike("slug", searchSlug)
           .single();
 
-      if (tenantError) {
-        console.error("Erro ao buscar tenant:", tenantError.message);
-      }
-
-      // VALIDAÇÃO DESATIVADA PARA TESTES
-      /*
       if (tenantError || !tenantData) {
-        document.body.innerHTML = `
-                    <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;font-size:20px;color:#333;background:#f5f5f5;">
-                        Empresa não encontrada
-                    </div>
-                `;
-        return;
+        console.error("Erro ao buscar tenant:", tenantError?.message);
+        alert("Erro: Empresa não identificada");
+        return; // Interrompe a execução
       }
-      */
       
-      if (tenantData) {
-        tenantId = tenantData.id;
-        localStorage.setItem("tenant_id", tenantId);
-      }
+      tenantId = tenantData.id;
+      localStorage.setItem("tenant_id", tenantId);
+    }
+  } else {
+    // Se não tiver slug na URL, verifica se tem no localStorage e se é válido
+    if (!tenantId || tenantId === "00000000-0000-0000-0000-000000000000") {
+      alert("Erro: Empresa não identificada");
+      return; // Interrompe a execução
     }
   }
 
@@ -281,9 +276,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!createClientPromise) {
       createClientPromise = (async () => {
         try {
-          // 4. Garantir que tenantId não seja nulo ou vazio
-          if (!tenantId || tenantId === "null" || tenantId === "undefined") {
-            tenantId = "00000000-0000-0000-0000-000000000000";
+          if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
+            alert("Erro: Empresa não identificada");
+            return;
           }
 
           const { data, error: selectError } = await window.supabaseClient
@@ -330,8 +325,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!window.supabaseClient) return;
     
     try {
-      if (!tenantId || tenantId === "null" || tenantId === "undefined") {
-        tenantId = "00000000-0000-0000-0000-000000000000";
+      if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
+        alert("Erro: Empresa não identificada");
+        return;
       }
       if (!clientId) throw new Error("clientId está vazio.");
 
