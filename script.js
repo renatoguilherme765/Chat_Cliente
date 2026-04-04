@@ -756,9 +756,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Fluxo Automático (WhatsApp ou /negociar)
       setTimeout(() => {
         const msg =
-          "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
+          "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu primeiro NOME.";
         addMessage(null, "system", msg);
-        currentStep = "cpf_whatsapp";
+        currentStep = "nome_whatsapp";
       }, 500);
     } else {
       // Fluxo Normal
@@ -769,17 +769,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         setTimeout(() => {
-          const cardHtml = `
-                        <div class="welcome-card">
-                            <img src="https://images.pexels.com/photos/3769021/pexels-photo-3769021.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Mulher feliz olhando para o celular" class="card-image" style="width: 100%; height: 200px; object-fit: cover; object-position: center 30%; border-radius: 10px 10px 0 0; background-color: #e0e0e0; display: block;" referrerpolicy="no-referrer">
-                            <div class="card-content">
-                                <h3>Zere sua dívida hoje!</h3>
-                                <p>Aproveite descontos exclusivos e volte a ter crédito no mercado.</p>
-                                <button class="chat-btn" onclick="handleAction('ver_condicoes')">Ver condições</button>
-                            </div>
-                        </div>
-                    `;
-          addMessage(null, "system", cardHtml);
+          addMessage("Agora, por favor, digite seu primeiro NOME.", "system");
+          currentStep = "nome";
         }, 1000);
       }, 500);
     }
@@ -944,20 +935,77 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    if (currentStep === "cpf" || currentStep === "cpf_whatsapp") {
+    if (currentStep === "nome" || currentStep === "nome_whatsapp") {
+      userName = text.trim();
+      if (userName.length >= 2) {
+        setTimeout(() => {
+          addMessage(`Obrigado, ${userName}! Por favor, informe seu CPF ou CNPJ para consultarmos seu contrato.`, "system");
+          currentStep = currentStep === "nome_whatsapp" ? "cpf_whatsapp" : "cpf";
+        }, 800);
+      } else {
+        setTimeout(() => {
+          addMessage("Por favor, digite um nome válido.", "system");
+        }, 800);
+      }
+    } else if (currentStep === "cpf" || currentStep === "cpf_whatsapp") {
       const cleanCPF = text.replace(/\D/g, "");
       if (cleanCPF.length >= 11) {
         const isCNPJ = cleanCPF.length >= 14;
         const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
 
+        // GRAVAÇÃO NO SUPABASE
+        if (supabase) {
+          supabase
+            .from("chat_clients")
+            .update({
+              name: userName,
+              cpf: cleanCPF,
+              status: "aguardando"
+            })
+            .eq("id", clientId)
+            .then();
+        }
+
         setTimeout(() => {
           addMessage(confirmMsg, "system");
 
-          setTimeout(() => {
-            addMessage("Agora, por favor, digite seu primeiro NOME.", "system");
-            currentStep =
-              currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
-          }, 800);
+          if (currentStep === "cpf_whatsapp") {
+            setTimeout(async () => {
+              const msg = `Você está sendo conectado a um especialista.`;
+              addMessage(null, "system", msg);
+              currentStep = "nome_recebido";
+              isLiveChat = true;
+
+              if (supabase) {
+                await createClientIfNotExists();
+                await supabase
+                  .from("chat_clients")
+                  .update({ status: "em_atendimento" })
+                  .eq("id", clientId);
+              }
+            }, 800);
+          } else {
+            setTimeout(() => {
+              addMessage(
+                `Consultando condições disponíveis...`,
+                "system",
+              );
+
+              setTimeout(() => {
+                const options = `
+                                  <p>Opções disponíveis:</p>
+                                  <div class="btn-container">
+                                      <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                      <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                      <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
+                                      <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
+                                  </div>
+                              `;
+                addMessage(null, "system", options);
+                currentStep = "nome_recebido";
+              }, 1500);
+            }, 800);
+          }
         }, 800);
       } else {
         setTimeout(() => {
@@ -972,62 +1020,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               "system",
             );
           }
-        }, 800);
-      }
-    } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
-      userName = text.trim();
-      if (userName.length >= 2) {
-        // Atualiza o nome do cliente no Supabase sem bloquear o fluxo
-        if (supabase) {
-          supabase
-            .from("chat_clients")
-            .update({
-              name: userName,
-            })
-            .eq("id", clientId)
-            .then();
-        }
-
-        if (currentStep === "nome_whatsapp") {
-          setTimeout(async () => {
-            const msg = `Obrigado. Você está sendo conectado a um especialista.`;
-            addMessage(null, "system", msg);
-            currentStep = "nome_recebido";
-            isLiveChat = true;
-
-            if (supabase) {
-              await createClientIfNotExists();
-              await supabase
-                .from("chat_clients")
-                .update({ status: "em_atendimento" })
-                .eq("id", clientId);
-            }
-          }, 800);
-        } else {
-          setTimeout(() => {
-            addMessage(
-              `Obrigado, ${userName}! Consultando condições disponíveis...`,
-              "system",
-            );
-
-            setTimeout(() => {
-              const options = `
-                                <p>Opções disponíveis:</p>
-                                <div class="btn-container">
-                                    <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
-                                    <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
-                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
-                                    <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
-                                </div>
-                            `;
-              addMessage(null, "system", options);
-              currentStep = "nome_recebido";
-            }, 1500);
-          }, 800);
-        }
-      } else {
-        setTimeout(() => {
-          addMessage("Por favor, digite um nome válido.", "system");
         }, 800);
       }
     } else if (currentStep === "nome_recebido") {
