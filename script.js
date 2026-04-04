@@ -299,7 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const insertData = {
               id: clientId,
               name: userName || "Cliente",
-              status: "bot",
+              status: "aguardando",
               tenant_id: tenantId,
             };
 
@@ -1061,15 +1061,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (userName.length >= 2) {
         // Atualiza o nome e CPF do cliente no Supabase
         if (window.supabaseClient) {
-          await window.supabaseClient
-            .from("chat_clients")
-            .upsert([{
-              id: clientId,
-              tenant_id: tenantId,
-              name: userName,
-              cpf_cnpj: window.userCpf || "",
-              status: "aguardando"
-            }]);
+          try {
+            const { error: updateError } = await window.supabaseClient
+              .from("chat_clients")
+              .update({
+                name: userName,
+                cpf_cnpj: window.userCpf || "",
+                status: "aguardando"
+              })
+              .eq("id", clientId)
+              .eq("tenant_id", tenantId);
+              
+            if (updateError) throw updateError;
+          } catch (err) {
+            console.error("Erro ao atualizar nome do cliente:", err);
+            alert("Erro ao atualizar nome: " + err.message);
+          }
         }
 
         if (currentStep === "nome_whatsapp") {
