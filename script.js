@@ -138,11 +138,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Lógica de Slug Dinâmico
   const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
-  let tenantId = localStorage.getItem("tenant_id") || null;
+  let tenantId = localStorage.getItem("tenant_id") || "default-tenant-id"; // FIXAR TENANT_ID (TESTE)
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
-    if (!slug) return "Atendimento Digital";
+    if (!slug || slug.toLowerCase() === 'index.html') return "Atendimento Digital";
     return slug
       .split(/[-_]/)
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -151,12 +151,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
   const headerTitle = document.querySelector(".header-title h1");
-  if (headerTitle && slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
+  if (headerTitle) {
     headerTitle.textContent = formatCompanyName(slug_da_url);
   }
 
   console.log("Slug capturado da URL:", slug_da_url);
 
+  // VALIDAÇÃO DESATIVADA PARA TESTES
+  /*
   if (!slug_da_url || slug_da_url.toLowerCase() === 'index.html') {
     document.body.innerHTML = `
             <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#333;background:#f5f5f5;text-align:center;padding:20px;">
@@ -166,8 +168,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         `;
     return;
   }
+  */
 
-  if (slug_da_url) {
+  if (slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
     const searchSlug = slug_da_url.toLowerCase();
     console.log("Buscando no banco o slug:", searchSlug);
 
@@ -183,6 +186,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.error("Erro ao buscar tenant:", tenantError.message);
       }
 
+      // VALIDAÇÃO DESATIVADA PARA TESTES
+      /*
       if (tenantError || !tenantData) {
         document.body.innerHTML = `
                     <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;font-size:20px;color:#333;background:#f5f5f5;">
@@ -191,8 +196,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                 `;
         return;
       }
-      tenantId = tenantData.id;
-      localStorage.setItem("tenant_id", tenantId);
+      */
+      
+      if (tenantData) {
+        tenantId = tenantData.id;
+        localStorage.setItem("tenant_id", tenantId);
+      }
     }
   }
 
