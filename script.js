@@ -978,16 +978,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (userName.length >= 2) {
         // Atualiza o nome e CPF do cliente no Supabase
         if (window.supabaseClient) {
-          window.supabaseClient
+          await window.supabaseClient
             .from("chat_clients")
-            .update({
+            .upsert([{
+              id: clientId,
+              tenant_id: tenantId,
               nome: userName,
               name: userName, // Mantendo name por compatibilidade
               cpf_cnpj: window.userCpf || "",
               status: "aguardando"
-            })
-            .eq("id", clientId)
-            .then();
+            }]);
         }
 
         if (currentStep === "nome_whatsapp") {
