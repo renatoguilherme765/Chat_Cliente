@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  localStorage.clear();
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
     try {
