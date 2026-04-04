@@ -945,6 +945,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (cleanCPF.length >= 11) {
         const isCNPJ = cleanCPF.length >= 14;
         const confirmMsg = isCNPJ ? "CNPJ recebido ✓" : "CPF recebido ✓";
+        
+        // Salva o CPF/CNPJ globalmente para usar no próximo passo
+        window.userCpf = cleanCPF;
 
         setTimeout(() => {
           addMessage(confirmMsg, "system");
@@ -973,12 +976,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
       userName = text.trim();
       if (userName.length >= 2) {
-        // Atualiza o nome do cliente no Supabase sem bloquear o fluxo
+        // Atualiza o nome e CPF do cliente no Supabase
         if (window.supabaseClient) {
           window.supabaseClient
             .from("chat_clients")
             .update({
-              name: userName,
+              nome: userName,
+              name: userName, // Mantendo name por compatibilidade
+              cpf_cnpj: window.userCpf || "",
+              status: "aguardando"
             })
             .eq("id", clientId)
             .then();
