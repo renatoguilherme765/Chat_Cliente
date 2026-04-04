@@ -80,14 +80,19 @@ async function renderMessages() {
             .eq('client_id', activeClientId)
             .order('created_at', { ascending: true });
 
+        if (error) {
+            console.error("Erro ao buscar mensagens:", error);
+        }
+
         if (messages) {
             messages.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `message ${msg.sender === 'client' ? 'client-msg' : 'agent-msg'}`;
                 
+                const messageText = msg.text || msg.content || '';
                 let parsed = null;
                 try {
-                    parsed = JSON.parse(msg.text);
+                    parsed = JSON.parse(messageText);
                 } catch {
                     // Ignorar erro de parse
                 }
@@ -125,12 +130,12 @@ async function renderMessages() {
                           </div>
                         `;
                     }
-                } else if (msg.text.startsWith('http')) {
-                    const isImage = msg.text.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                } else if (messageText.startsWith('http')) {
+                    const isImage = messageText.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                     if (isImage) {
-                        div.innerHTML = `<img src="${msg.text}" style="max-width: 100%; border-radius: 8px;" />`;
+                        div.innerHTML = `<img src="${messageText}" style="max-width: 100%; border-radius: 8px;" />`;
                     } else {
-                        const fileName = msg.text.split('/').pop() || 'Documento';
+                        const fileName = messageText.split('/').pop() || 'Documento';
                         div.innerHTML = `
                           <div style="
                             display:flex;
@@ -149,7 +154,7 @@ async function renderMessages() {
                             ">
                               ${fileName}
                             </div>
-                            <a href="${msg.text}" download style="
+                            <a href="${messageText}" download style="
                               margin-top:6px;
                               font-size:12px;
                               color:#2563eb;
@@ -163,10 +168,10 @@ async function renderMessages() {
                     }
                 } else {
                     // Se o texto parecer HTML, renderizamos como HTML, senão como texto puro
-                    if (msg.text.trim().startsWith('<') && msg.text.trim().endsWith('>')) {
-                        div.innerHTML = msg.text;
+                    if (messageText.trim().startsWith('<') && messageText.trim().endsWith('>')) {
+                        div.innerHTML = messageText;
                     } else {
-                        div.textContent = msg.text;
+                        div.textContent = messageText;
                     }
                 }
                 
@@ -181,9 +186,10 @@ async function renderMessages() {
                 const div = document.createElement('div');
                 div.className = `message ${msg.type === 'user' ? 'client-msg' : 'agent-msg'}`;
                 
+                const messageText = msg.content || msg.text || '';
                 let parsed = null;
                 try {
-                    parsed = JSON.parse(msg.content);
+                    parsed = JSON.parse(messageText);
                 } catch {
                     // Ignorar erro de parse
                 }
@@ -224,12 +230,12 @@ async function renderMessages() {
                         `;
                     }
                 } else {
-                    if (msg.content.startsWith('http')) {
-                        const isImage = msg.content.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
+                    if (messageText.startsWith('http')) {
+                        const isImage = messageText.match(/\.(png|jpg|jpeg|gif)(\?.*)?$/i);
                         if (isImage) {
-                            div.innerHTML = `<img src="${msg.content}" style="max-width: 100%; border-radius: 8px;" />`;
+                            div.innerHTML = `<img src="${messageText}" style="max-width: 100%; border-radius: 8px;" />`;
                         } else {
-                            const fileName = msg.content.split('/').pop() || 'Documento';
+                            const fileName = messageText.split('/').pop() || 'Documento';
                             div.innerHTML = `
                               <div style="
                                 display:flex;
@@ -248,7 +254,7 @@ async function renderMessages() {
                                 ">
                                   ${fileName}
                                 </div>
-                                <a href="${msg.content}" download style="
+                                <a href="${messageText}" download style="
                                   margin-top:6px;
                                   font-size:12px;
                                   color:#2563eb;
@@ -261,7 +267,7 @@ async function renderMessages() {
                             `;
                         }
                     } else {
-                        div.textContent = msg.content;
+                        div.textContent = messageText;
                     }
                 }
                 chatMessages.appendChild(div);
@@ -269,7 +275,10 @@ async function renderMessages() {
         }
     }
     
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTo({
+        top: chatMessages.scrollHeight,
+        behavior: 'smooth'
+    });
 }
 
 // Escuta mudanças
@@ -298,11 +307,13 @@ if (window.supabaseClient) {
             renderMessages();
         }
     });
-    setInterval(() => {
-        renderClients();
-        renderMessages();
-    }, 2000);
 }
+
+// Sempre faz polling por segurança (caso o Realtime não esteja ativado no Supabase)
+setInterval(() => {
+    renderClients();
+    renderMessages();
+}, 3000);
 
 // Envio de arquivo pelo agente
 const agentFileInput = document.getElementById('agentFileInput');
@@ -335,10 +346,10 @@ if (agentFileInput) {
             .getPublicUrl(filePath);
 
         if (data && data.publicUrl) {
-            const tenantId = localStorage.getItem('tenant_id');
+            const tenantId = localStorage.getItem('tenant_id') || 'default-tenant-id';
             await window.supabaseClient.from('chat_messages').insert({
                 client_id: activeClientId,
-                especialista_id: specialistId,
+                specialist_id: specialistId,
                 tenant_id: tenantId,
                 sender: 'system',
                 text: data.publicUrl,
@@ -346,7 +357,7 @@ if (agentFileInput) {
             });
             await window.supabaseClient.from('chat_clients').update({ 
                 status: 'em_atendimento',
-                especialista_id: specialistId 
+                specialist_id: specialistId 
             }).eq('id', activeClientId);
             renderMessages();
         }
@@ -362,10 +373,10 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (!text || !activeClientId) return;
 
     if (window.supabaseClient) {
-        const tenantId = localStorage.getItem('tenant_id');
+        const tenantId = localStorage.getItem('tenant_id') || 'default-tenant-id';
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
-            especialista_id: specialistId,
+            specialist_id: specialistId,
             tenant_id: tenantId,
             sender: 'system',
             text: text,
@@ -373,7 +384,7 @@ document.getElementById('agentSendBtn').onclick = async () => {
         });
         await window.supabaseClient.from('chat_clients').update({ 
             status: 'em_atendimento',
-            especialista_id: specialistId
+            specialist_id: specialistId
         }).eq('id', activeClientId);
     } else {
         let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');

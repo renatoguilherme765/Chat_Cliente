@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configurações do Supabase
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://pjnauygynuakdurokkew.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_5ksGaNp4pNRKpJA8X8SAGA_SmmCAiX2';
 
 console.log("Verificando variáveis de ambiente do Supabase...");
 console.log("VITE_SUPABASE_URL definida?", !!SUPABASE_URL);

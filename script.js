@@ -324,14 +324,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         (payload) => {
           if (payload.new.sender === "specialist" || payload.new.sender === "system") {
             // Evita duplicar mensagens que o próprio sistema local enviou
-            if (!localMessages.has(payload.new.text)) {
+            const messageText = payload.new.text || payload.new.content || '';
+            if (!localMessages.has(messageText)) {
               let parsed;
 
               try {
                 parsed =
-                  typeof payload.new.text === "string"
-                    ? JSON.parse(payload.new.text)
-                    : payload.new.text;
+                  typeof messageText === "string"
+                    ? JSON.parse(messageText)
+                    : messageText;
               } catch {
                 parsed = null;
               }
@@ -408,7 +409,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
               } else {
                 addMessage(
-                  payload.new.text,
+                  messageText,
                   "system",
                   null,
                   false,
@@ -552,7 +553,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     msgDiv.appendChild(timeDiv);
 
     chatArea.appendChild(msgDiv);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    chatArea.scrollTo({
+      top: chatArea.scrollHeight,
+      behavior: 'smooth'
+    });
 
     if (save) {
       saveMessageToSupabase(text, type, htmlContent, msgDiv);
@@ -584,6 +588,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições."
         )
           return;
+
+        // Evita duplicar mensagens
+        if (localMessages.has(messageText)) return;
+        localMessages.add(messageText);
 
         const type = (msg.sender === "client" || msg.sender_type === "cliente") ? "user" : "system";
         // Adiciona a mensagem sem salvar novamente no banco
@@ -730,6 +738,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.loadExistingMessages = loadExistingMessages;
 
+  // Polling de segurança para garantir que mensagens cheguem mesmo sem Realtime
+  setInterval(() => {
+    if (isLiveChat && window.supabaseClient) {
+      loadExistingMessages();
+    }
+  }, 3000);
+
   // Fluxo Inicial
   async function initChat() {
     const isNegociarRoute =
@@ -838,7 +853,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 {
                   client_id: clientId,
                   tenant_id: tenantId,
-                  especialista_id: null,
+                  specialist_id: null,
                   text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
                   sender: "client",
                   created_at: new Date(),
@@ -918,7 +933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 {
                   client_id: clientId,
                   tenant_id: tenantId,
-                  especialista_id: null,
+                  specialist_id: null,
                   text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
                   sender: "client",
                   created_at: new Date(),
