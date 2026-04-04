@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Lógica de Slug Dinâmico
   const slug_da_url = window.location.pathname.split('/').filter(Boolean).pop();
-  let tenantId = localStorage.getItem("tenant_id") || "default-tenant-id"; // FIXAR TENANT_ID (TESTE)
+  let tenantId = localStorage.getItem("tenant_id") || "00000000-0000-0000-0000-000000000000"; // FIXAR TENANT_ID (TESTE)
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -237,6 +237,40 @@ document.addEventListener("DOMContentLoaded", async () => {
   const localMessages = new Set();
   let clientEnsured = false;
 
+  // Função para exibir alertas na tela (já que window.alert não funciona bem no iframe)
+  function customAlert(message) {
+    console.error("ALERTA DE ERRO:", message);
+    const alertDiv = document.createElement("div");
+    alertDiv.style.position = "fixed";
+    alertDiv.style.top = "20px";
+    alertDiv.style.left = "50%";
+    alertDiv.style.transform = "translateX(-50%)";
+    alertDiv.style.backgroundColor = "#ff4444";
+    alertDiv.style.color = "white";
+    alertDiv.style.padding = "15px 20px";
+    alertDiv.style.borderRadius = "8px";
+    alertDiv.style.zIndex = "999999";
+    alertDiv.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+    alertDiv.style.fontFamily = "sans-serif";
+    alertDiv.style.fontWeight = "bold";
+    alertDiv.innerHTML = message;
+    
+    const closeBtn = document.createElement("button");
+    closeBtn.innerHTML = "X";
+    closeBtn.style.marginLeft = "15px";
+    closeBtn.style.background = "none";
+    closeBtn.style.border = "none";
+    closeBtn.style.color = "white";
+    closeBtn.style.fontWeight = "bold";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.onclick = () => alertDiv.remove();
+    
+    alertDiv.appendChild(closeBtn);
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => alertDiv.remove(), 10000);
+  }
+
   // 3. Criar cliente na tabela chat_clients
   let clientCreated = false;
   let createClientPromise = null;
@@ -246,27 +280,43 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!createClientPromise) {
       createClientPromise = (async () => {
-        const { data } = await window.supabaseClient
-          .from("chat_clients")
-          .select("id")
-          .eq("id", clientId)
-          .eq("tenant_id", tenantId);
-
-        if (!data || data.length === 0) {
-          const insertData = {
-            id: clientId,
-            name: "Cliente",
-            status: "bot",
-            tenant_id: tenantId,
-          };
-
-          if (telefoneCliente) {
-            insertData.telefone = telefoneCliente;
+        try {
+          // 4. Garantir que tenantId não seja nulo ou vazio
+          if (!tenantId || tenantId === "null" || tenantId === "undefined") {
+            tenantId = "00000000-0000-0000-0000-000000000000";
           }
 
-          await window.supabaseClient.from("chat_clients").insert([insertData]);
+          const { data, error: selectError } = await window.supabaseClient
+            .from("chat_clients")
+            .select("id")
+            .eq("id", clientId)
+            .eq("tenant_id", tenantId);
+
+          if (selectError) throw selectError;
+
+          if (!data || data.length === 0) {
+            // 1. Usar userName se disponível, senão "Cliente"
+            const insertData = {
+              id: clientId,
+              name: userName || "Cliente",
+              status: "bot",
+              tenant_id: tenantId,
+            };
+
+            if (telefoneCliente) {
+              insertData.telefone = telefoneCliente;
+            }
+
+            const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
+            if (insertError) throw insertError;
+          }
+          clientCreated = true;
+        } catch (error) {
+          // 2 e 3. Try/Catch e Alert
+          alert("Erro no Supabase: " + error.message);
+          customAlert("Erro no Supabase (Criar Cliente): " + error.message);
+          clientCreated = false; // Permite tentar novamente
         }
-        clientCreated = true;
       })();
     }
     await createClientPromise;
@@ -278,15 +328,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
     if (!window.supabaseClient) return;
-    if (!clientId || !tenantId) return;
-    await createClientIfNotExists();
-
-    let sender = type === "user" ? "client" : "system";
-    let messageText = text || htmlContent;
-
-    localMessages.add(messageText);
-
+    
     try {
+      if (!tenantId || tenantId === "null" || tenantId === "undefined") {
+        tenantId = "00000000-0000-0000-0000-000000000000";
+      }
+      if (!clientId) throw new Error("clientId está vazio.");
+
+      await createClientIfNotExists();
+
+      // 5. Garantir que sender seja 'client'
+      let sender = type === "user" ? "client" : "system";
+      let messageText = text || htmlContent;
+
+      localMessages.add(messageText);
+
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
@@ -297,7 +353,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ]);
 
       if (error) {
-        console.error("Erro do Supabase ao inserir mensagem:", error);
+        throw error;
       } else if (msgDiv && msgDiv._statusSpan) {
         // Ícone de check (enviado)
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
@@ -305,6 +361,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         msgDiv._statusSpan.title = "Enviada";
       }
     } catch (err) {
+      // 2 e 3. Try/Catch e Alert
+      alert("Erro no Supabase: " + err.message);
+      customAlert("Erro no Supabase (Salvar Mensagem): " + err.message);
       console.error("Erro ao salvar mensagem no Supabase:", err);
     }
   }
@@ -1007,8 +1066,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             .upsert([{
               id: clientId,
               tenant_id: tenantId,
-              nome: userName,
-              name: userName, // Mantendo name por compatibilidade
+              name: userName,
               cpf_cnpj: window.userCpf || "",
               status: "aguardando"
             }]);

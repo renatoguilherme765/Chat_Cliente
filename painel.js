@@ -346,7 +346,7 @@ if (agentFileInput) {
             .getPublicUrl(filePath);
 
         if (data && data.publicUrl) {
-            const tenantId = localStorage.getItem('tenant_id') || 'default-tenant-id';
+            const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
             await window.supabaseClient.from('chat_messages').insert({
                 client_id: activeClientId,
                 specialist_id: specialistId,
@@ -373,7 +373,7 @@ document.getElementById('agentSendBtn').onclick = async () => {
     if (!text || !activeClientId) return;
 
     if (window.supabaseClient) {
-        const tenantId = localStorage.getItem('tenant_id') || 'default-tenant-id';
+        const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
         await window.supabaseClient.from('chat_messages').insert({
             client_id: activeClientId,
             specialist_id: specialistId,
