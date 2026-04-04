@@ -139,7 +139,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Lógica de Slug Dinâmico
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
-  let tenantId = localStorage.getItem("tenant_id");
+  
+  // ID REAL da empresa ml-gomes
+  let tenantId = '0be66bb8-16e6-47e3-9813-73ee9d5ff16d';
+  localStorage.setItem("tenant_id", tenantId);
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -171,6 +174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   */
 
+  /*
   if (slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
     const searchSlug = slug_da_url.toLowerCase();
     console.log("Buscando no banco o slug:", searchSlug);
@@ -199,6 +203,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return; // Interrompe a execução
     }
   }
+  */
 
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
@@ -295,7 +300,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               id: clientId,
               name: userName || "Cliente",
               status: "aguardando",
-              tenant_id: tenantId,
+              tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
             };
 
             if (telefoneCliente) {
@@ -342,7 +347,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
-          tenant_id: tenantId,
+          tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
           text: messageText,
           sender: sender
         },
