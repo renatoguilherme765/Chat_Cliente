@@ -1,3 +1,7 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+
 document.addEventListener("DOMContentLoaded", async () => {
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
@@ -63,9 +67,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // 2. Buscar o CPF/CNPJ do cliente no banco
       let storedDoc = null;
 
-      if (window.supabaseClient) {
+      if (supabase) {
         // Tenta buscar da tabela chat_clients (pode ser cpf ou documento)
-        const { data, error } = await window.supabaseClient
+        const { data, error } = await supabase
           .from("chat_clients")
           .select("cpf, documento")
           .eq("id", clientId)
@@ -78,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Se não encontrou na tabela, tenta buscar nas mensagens do cliente
         if (!storedDoc) {
-          const { data: msgs } = await window.supabaseClient
+          const { data: msgs } = await supabase
             .from("chat_messages")
             .select("content")
             .eq("client_id", clientId)
@@ -171,9 +175,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchSlug = slug_da_url.toLowerCase();
     console.log("Buscando no banco o slug:", searchSlug);
 
-    if (window.supabaseClient) {
+    if (supabase) {
       const { data: tenantData, error: tenantError } =
-        await window.supabaseClient
+        await supabase
           .from("tenants")
           .select("*")
           .ilike("slug", searchSlug)
@@ -214,11 +218,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
   let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
   let isReturningClient = !!clientId;
-  
-  if (!clientId) {
-    clientId = crypto.randomUUID();
-    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
-  }
 
   // 2. Garantir que a área de chat comece vazia
   if (chatArea) {
@@ -233,29 +232,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   let createClientPromise = null;
 
   async function createClientIfNotExists() {
-    if (!window.supabaseClient || clientCreated) return;
+    if (!supabase || clientCreated) return;
 
     if (!createClientPromise) {
       createClientPromise = (async () => {
-        const { data } = await window.supabaseClient
-          .from("chat_clients")
-          .select("id")
-          .eq("id", clientId)
-          .eq("tenant_id", tenantId);
+        if (clientId) {
+          const { data } = await supabase
+            .from("chat_clients")
+            .select("id")
+            .eq("id", clientId)
+            .eq("tenant_id", tenantId);
 
-        if (!data || data.length === 0) {
-          const insertData = {
-            id: clientId,
-            name: "Cliente",
-            status: "bot",
-            tenant_id: tenantId,
-          };
-
-          if (telefoneCliente) {
-            insertData.telefone = telefoneCliente;
+          if (data && data.length > 0) {
+            clientCreated = true;
+            return;
           }
+        }
 
-          await window.supabaseClient.from("chat_clients").insert([insertData]);
+        const insertData = {
+          name: "Cliente",
+          status: "bot",
+          tenant_id: tenantId,
+        };
+
+        if (telefoneCliente) {
+          insertData.telefone = telefoneCliente;
+        }
+
+        const { data: newClient, error } = await supabase.from("chat_clients").insert([insertData]).select().single();
+        if (newClient && newClient.id) {
+          clientId = newClient.id;
+          localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
         }
         clientCreated = true;
       })();
@@ -264,11 +271,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Inicializa a verificação do cliente assim que abre o chat
-  createClientIfNotExists();
+  await createClientIfNotExists();
 
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient) return;
+    if (!supabase) return;
     await createClientIfNotExists();
 
     let sender = type === "user" ? "cliente" : "system";
@@ -279,7 +286,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       // Inserção simplificada para evitar erro 400 (Bad Request)
       // Removidos tenant_id e especialista_id que podiam estar nulos ou ausentes
-      const { error } = await window.supabaseClient.from("chat_messages").insert([
+      const { error } = await supabase.from("chat_messages").insert([
         {
           client_id: clientId,
           text: messageText,
@@ -301,8 +308,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // 5. Escutar mensagens em tempo real
-  if (window.supabaseClient) {
-    window.supabaseClient
+  if (supabase) {
+    supabase
       .channel(`chat_messages_${clientId}`)
       .on(
         "postgres_changes",
@@ -552,9 +559,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Função para carregar histórico de mensagens
   async function loadExistingMessages() {
-    if (!window.supabaseClient) return false;
+    if (!supabase) return false;
 
-    const { data: messages, error } = await window.supabaseClient
+    const { data: messages, error } = await supabase
       .from("chat_messages")
       .select("*")
       .eq("client_id", clientId)
@@ -650,7 +657,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       // Verifica o status do cliente para saber se já está em atendimento
-      const { data: clientData } = await window.supabaseClient
+      const { data: clientData } = await supabase
         .from("chat_clients")
         .select("status")
         .eq("id", clientId)
@@ -822,9 +829,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           addMessage("Você será redirecionado para um especialista.", "system");
           isLiveChat = true;
 
-          if (window.supabaseClient) {
+          if (supabase) {
             await createClientIfNotExists();
-            await window.supabaseClient.from("chat_messages").insert([
+            await supabase.from("chat_messages").insert([
               {
                 client_id: clientId,
                 especialista_id: null,
@@ -833,7 +840,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 created_at: new Date(),
               },
             ]);
-            await window.supabaseClient
+            await supabase
               .from("chat_clients")
               .update({ status: "aguardando" })
               .eq("id", clientId);
@@ -864,9 +871,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
         isLiveChat = true;
 
-        if (window.supabaseClient) {
+        if (supabase) {
           await createClientIfNotExists();
-          await window.supabaseClient
+          await supabase
             .from("chat_clients")
             .update({ status: "aguardando" })
             .eq("id", clientId);
@@ -900,10 +907,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           setTimeout(async () => {
             isLiveChat = true;
-            if (window.supabaseClient) {
+            if (supabase) {
               await createClientIfNotExists();
               // Envia uma mensagem para o especialista (aparecerá no painel como se fosse do cliente)
-              await window.supabaseClient.from("chat_messages").insert([
+              await supabase.from("chat_messages").insert([
                 {
                   client_id: clientId,
                   especialista_id: null,
@@ -912,7 +919,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   created_at: new Date(),
                 },
               ]);
-              await window.supabaseClient
+              await supabase
                 .from("chat_clients")
                 .update({ status: "aguardando" })
                 .eq("id", clientId);
@@ -971,8 +978,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       userName = text.trim();
       if (userName.length >= 2) {
         // Atualiza o nome do cliente no Supabase sem bloquear o fluxo
-        if (window.supabaseClient) {
-          window.supabaseClient
+        if (supabase) {
+          supabase
             .from("chat_clients")
             .update({
               name: userName,
@@ -988,9 +995,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             currentStep = "nome_recebido";
             isLiveChat = true;
 
-            if (window.supabaseClient) {
+            if (supabase) {
               await createClientIfNotExists();
-              await window.supabaseClient
+              await supabase
                 .from("chat_clients")
                 .update({ status: "em_atendimento" })
                 .eq("id", clientId);
@@ -1049,7 +1056,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (!window.supabaseClient) {
+      if (!supabase) {
         alert("Supabase não configurado.");
         return;
       }
@@ -1057,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const filePath = `${clientId}/${Date.now()}_${file.name}`;
 
       // Upload the file
-      const { error } = await window.supabaseClient.storage
+      const { error } = await supabase.storage
         .from("Chat_attachments")
         .upload(filePath, file);
 
@@ -1068,7 +1075,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       // Get public URL
-      const { data } = window.supabaseClient.storage
+      const { data } = supabase.storage
         .from("Chat_attachments")
         .getPublicUrl(filePath);
 
