@@ -279,6 +279,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   let createClientPromise = null;
 
   async function createClientAndSaveHistory(name, cpfCnpj) {
+    // 4. Garantir que o client_id seja gerado e validado ANTES de iniciar
+    if (!clientId) {
+      clientId = crypto.randomUUID();
+      localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+    }
+
     if (!window.supabaseClient || clientCreated || isProcessing) return;
     
     isProcessing = true; // Ativa a trava
@@ -306,27 +312,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
       if (insertError) throw insertError;
 
-      // 2. Salvar histórico de mensagens (Apenas insert no banco, SEM renderização visual)
-      const messagesToSave = [];
+      // 2. ENVIO EM SEQUÊNCIA (PROMISE CHAIN)
       const messageElements = chatArea.querySelectorAll('.message');
       
-      messageElements.forEach(msgDiv => {
+      for (const msgDiv of messageElements) {
         const text = msgDiv.querySelector('.message-text')?.textContent || "";
         const isUser = msgDiv.classList.contains('user-msg');
         
-        // Filtro de envio solicitado
-        messagesToSave.push({
+        const messagePayload = {
           client_id: clientId,
           tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
           text: text,
           sender: isUser ? "client" : "system",
           created_at: new Date().toISOString()
-        });
-      });
+        };
 
-      if (messagesToSave.length > 0) {
-        const { error: msgError } = await window.supabaseClient.from("chat_messages").insert(messagesToSave);
+        const { error: msgError } = await window.supabaseClient.from("chat_messages").insert([messagePayload]);
         if (msgError) throw msgError;
+
+        // 2. MARCAÇÃO DE TEMPO: Delay de 100ms
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       clientCreated = true;
