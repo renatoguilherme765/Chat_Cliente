@@ -214,6 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentStep = "start";
   let isLiveChat = false;
   let userName = "";
+  let optionsDisplayed = false; // Trava para evitar repetição do menu
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -1028,40 +1029,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
       userName = text.trim();
       if (userName.length >= 2) {
-        // Atualiza o nome e CPF do cliente no Supabase
-        if (window.supabaseClient) {
-          try {
-            const { error: updateError } = await window.supabaseClient
-              .from("chat_clients")
-              .update({
-                name: userName,
-                cpf_cnpj: window.userCpf || "",
-                status: "aguardando"
-              })
-              .eq("id", clientId)
-              .eq("tenant_id", tenantId);
-              
-            if (updateError) throw updateError;
-          } catch (err) {
-            console.error("Erro ao atualizar nome do cliente:", err);
-            alert("Erro ao atualizar nome: " + err.message);
-          }
-        }
+        currentStep = "nome_recebido"; // Atualiza o passo imediatamente
 
         if (currentStep === "nome_whatsapp") {
           setTimeout(async () => {
             const msg = `Obrigado. Você está sendo conectado a um especialista.`;
             addMessage(null, "system", msg);
-            currentStep = "nome_recebido";
             isLiveChat = true;
-
-            if (window.supabaseClient) {
-              await createClientIfNotExists();
-              await window.supabaseClient
-                .from("chat_clients")
-                .update({ status: "em_atendimento" })
-                .eq("id", clientId);
-            }
+            // Apenas aqui chamamos o Supabase
+            await createClientAndSaveHistory(userName, window.userCpf);
           }, 800);
         } else {
           setTimeout(() => {
@@ -1071,7 +1047,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
 
             setTimeout(() => {
-              const options = `
+              if (!optionsDisplayed) { // Trava de estado
+                const options = `
                                 <p>Opções disponíveis:</p>
                                 <div class="btn-container">
                                     <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
@@ -1080,8 +1057,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                                     <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                                 </div>
                             `;
-              addMessage(null, "system", options);
-              currentStep = "nome_recebido";
+                addMessage(null, "system", options);
+                optionsDisplayed = true;
+              }
             }, 1500);
           }, 800);
         }
