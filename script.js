@@ -275,18 +275,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 3. Criar cliente na tabela chat_clients
   let clientCreated = false;
-  let isSaving = false; // Trava de controle para evitar cliques múltiplos
+  let isProcessing = false; // Flag de controle para evitar múltiplos cliques
   let createClientPromise = null;
 
   async function createClientAndSaveHistory(name, cpfCnpj) {
-    if (!window.supabaseClient || clientCreated || isSaving) return;
+    if (!window.supabaseClient || clientCreated || isProcessing) return;
     
-    isSaving = true; // Ativa a trava
+    isProcessing = true; // Ativa a trava
 
     try {
       if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
         alert("Erro: Empresa não identificada");
-        isSaving = false;
+        isProcessing = false;
         return;
       }
 
@@ -306,7 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
       if (insertError) throw insertError;
 
-      // 2. Salvar histórico de mensagens (Filtrado conforme solicitado)
+      // 2. Salvar histórico de mensagens (Apenas insert no banco, SEM renderização visual)
       const messagesToSave = [];
       const messageElements = chatArea.querySelectorAll('.message');
       
@@ -314,8 +314,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const text = msgDiv.querySelector('.message-text')?.textContent || "";
         const isUser = msgDiv.classList.contains('user-msg');
         
-        // Filtro de envio: [Mensagem do Bot, CPF do Cliente, Nome do Cliente, Opção Escolhida]
-        // Simplificado para capturar o contexto relevante
+        // Filtro de envio solicitado
         messagesToSave.push({
           client_id: clientId,
           tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
@@ -331,14 +330,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       clientCreated = true;
-      // Resposta Final: Apenas esta mensagem deve aparecer na tela após o clique
+      
+      // 3. MENSAGEM DE TRANSIÇÃO: Única manipulação visual permitida após o clique
       addMessage("Aguarde um instante, você será conectado a um especialista.", "system", null, false);
       
     } catch (error) {
       console.error("Erro ao persistir histórico:", error);
       alert("Erro ao conectar com especialista: " + error.message);
     } finally {
-      isSaving = false; // Libera a trava
+      isProcessing = false; // Libera a trava
     }
   }
 
