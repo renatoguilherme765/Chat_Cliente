@@ -276,70 +276,65 @@ document.addEventListener("DOMContentLoaded", async () => {
   let clientCreated = false;
   let createClientPromise = null;
 
-  async function createClientIfNotExists() {
+  async function createClientAndSaveHistory(name, cpfCnpj) {
     if (!window.supabaseClient || clientCreated) return;
 
-    if (!createClientPromise) {
-      createClientPromise = (async () => {
-        try {
-          if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
-            alert("Erro: Empresa não identificada");
-            return;
-          }
-
-          const { data, error: selectError } = await window.supabaseClient
-            .from("chat_clients")
-            .select("id")
-            .eq("id", clientId)
-            .eq("tenant_id", tenantId);
-
-          if (selectError) throw selectError;
-
-          if (!data || data.length === 0) {
-            // 1. Usar userName se disponível, senão "Cliente"
-            const insertData = {
-              id: clientId,
-              name: userName || "Cliente",
-              status: "aguardando",
-              tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
-            };
-
-            if (telefoneCliente) {
-              insertData.telefone = telefoneCliente;
-            }
-
-            const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
-            if (insertError) throw insertError;
-          }
-          clientCreated = true;
-        } catch (error) {
-          // 2 e 3. Try/Catch e Alert
-          alert("Erro no Supabase: " + error.message);
-          customAlert("Erro no Supabase (Criar Cliente): " + error.message);
-          clientCreated = false; // Permite tentar novamente
-        }
-      })();
-    }
-    await createClientPromise;
-  }
-
-  // Inicializa a verificação do cliente assim que abre o chat
-  // createClientIfNotExists();
-
-  // 2 e 4. Salvar mensagens no Supabase
-  async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient) return;
-    
     try {
       if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
         alert("Erro: Empresa não identificada");
         return;
       }
-      if (!clientId) throw new Error("clientId está vazio.");
 
-      await createClientIfNotExists();
+      // 1. Cadastrar cliente
+      const insertData = {
+        id: clientId,
+        name: name || "Cliente",
+        cpf_cnpj: cpfCnpj || "",
+        status: "aguardando",
+        tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+      };
 
-      // 5. Garantir que sender seja 'client'
+      if (telefoneCliente) {
+        insertData.telefone = telefoneCliente;
+      }
+
+      const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
+      if (insertError) throw insertError;
+
+      // 2. Salvar histórico de mensagens
+      const messagesToSave = [];
+      const messageElements = chatArea.querySelectorAll('.message');
+      
+      messageElements.forEach(msgDiv => {
+        const text = msgDiv.querySelector('.message-text')?.textContent || "";
+        const isUser = msgDiv.classList.contains('user-msg');
+        
+        messagesToSave.push({
+          client_id: clientId,
+          tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+          text: text,
+          sender: isUser ? "client" : "system",
+          created_at: new Date().toISOString()
+        });
+      });
+
+      if (messagesToSave.length > 0) {
+        const { error: msgError } = await window.supabaseClient.from("chat_messages").insert(messagesToSave);
+        if (msgError) throw msgError;
+      }
+
+      clientCreated = true;
+    } catch (error) {
+      console.error("Erro ao persistir histórico:", error);
+      alert("Erro ao conectar com especialista: " + error.message);
+    }
+  }
+
+  // 2 e 4. Salvar mensagens no Supabase (apenas se já criado)
+  async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
+    if (!window.supabaseClient || !clientCreated) return;
+    
+    try {
       let sender = type === "user" ? "client" : "system";
       let messageText = text || htmlContent;
 
@@ -354,18 +349,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
       ]);
 
-      if (error) {
-        throw error;
-      } else if (msgDiv && msgDiv._statusSpan) {
-        // Ícone de check (enviado)
+      if (error) throw error;
+      
+      if (msgDiv && msgDiv._statusSpan) {
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
         msgDiv._statusSpan.style.opacity = "1";
-        msgDiv._statusSpan.title = "Enviada";
       }
     } catch (err) {
-      // 2 e 3. Try/Catch e Alert
-      alert("Erro no Supabase: " + err.message);
-      customAlert("Erro no Supabase (Salvar Mensagem): " + err.message);
       console.error("Erro ao salvar mensagem no Supabase:", err);
     }
   }
@@ -907,17 +897,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isLiveChat = true;
 
           if (window.supabaseClient) {
-            await createClientIfNotExists();
-              await window.supabaseClient.from("chat_messages").insert([
-                {
-                  client_id: clientId,
-                  tenant_id: tenantId,
-                  specialist_id: null,
-                  text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
-                  sender: "client",
-                  created_at: new Date(),
-                },
-              ]);
+            await createClientAndSaveHistory(userName, window.userCpf);
             await window.supabaseClient
               .from("chat_clients")
               .update({ status: "aguardando" })
@@ -950,7 +930,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         isLiveChat = true;
 
         if (window.supabaseClient) {
-          await createClientIfNotExists();
+          await createClientAndSaveHistory(userName, window.userCpf);
           await window.supabaseClient
             .from("chat_clients")
             .update({ status: "aguardando" })
@@ -986,18 +966,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           setTimeout(async () => {
             isLiveChat = true;
             if (window.supabaseClient) {
-              await createClientIfNotExists();
-              // Envia uma mensagem para o especialista (aparecerá no painel como se fosse do cliente)
-              await window.supabaseClient.from("chat_messages").insert([
-                {
-                  client_id: clientId,
-                  tenant_id: tenantId,
-                  specialist_id: null,
-                  text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
-                  sender: "client",
-                  created_at: new Date(),
-                },
-              ]);
+              await createClientAndSaveHistory(userName, window.userCpf);
               await window.supabaseClient
                 .from("chat_clients")
                 .update({ status: "aguardando" })
