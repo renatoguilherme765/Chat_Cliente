@@ -390,27 +390,26 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          // 1. FILTRO DE REALTIME: Ignorar mensagens cujo 'sender' seja 'bot' ou 'client'.
-          // Renderizar na tela APENAS mensagens vindas do 'specialist'.
-          if (payload.new.sender === "specialist") {
-            const messageText = payload.new.text || payload.new.content || '';
-            
-            // Evita duplicar mensagens que o próprio sistema local enviou
-            if (!localMessages.has(messageText)) {
-              let parsed;
+          if (payload.new.sender !== "specialist") return;
 
-              try {
-                parsed =
-                  typeof messageText === "string"
-                    ? JSON.parse(messageText)
-                    : messageText;
-              } catch {
-                parsed = null;
-              }
+          const messageText = payload.new.text || payload.new.content || "";
 
-              if (parsed && parsed.__isFile) {
-                if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
-                  const imgHtml = `
+          // Evita duplicar mensagens que o próprio sistema local enviou
+          if (!localMessages.has(messageText)) {
+            let parsed;
+
+            try {
+              parsed =
+                typeof messageText === "string"
+                  ? JSON.parse(messageText)
+                  : messageText;
+            } catch {
+              parsed = null;
+            }
+
+            if (parsed && parsed.__isFile) {
+              if (parsed.url && parsed.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                const imgHtml = `
                                     <div style="position: relative; display: inline-block; max-width: 100%;">
                                         <img src="${parsed.url}" style="max-width: 100%; height: auto; border-radius: 8px; display: block;" />
                                         <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.downloadImage('${parsed.url}', 'imagem.jpg');" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
@@ -421,15 +420,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                                         </a>
                                     </div>
                                 `;
-                  addMessage(
-                    null,
-                    "system",
-                    imgHtml,
-                    false,
-                    payload.new.created_at,
-                  );
-                } else {
-                  const fileHtml = `
+                addMessage(
+                  null,
+                  "system",
+                  imgHtml,
+                  false,
+                  payload.new.created_at,
+                );
+              } else {
+                const fileHtml = `
                                   <div 
                                     onclick="window.downloadPdf('${parsed.url}', '${parsed.name}')"
                                     style="
@@ -470,23 +469,22 @@ document.addEventListener("DOMContentLoaded", async () => {
                                     </div>
                                   </div>
                                 `;
-                  addMessage(
-                    null,
-                    "system",
-                    fileHtml,
-                    false,
-                    payload.new.created_at,
-                  );
-                }
-              } else {
                 addMessage(
-                  messageText,
-                  "system",
                   null,
+                  "system",
+                  fileHtml,
                   false,
                   payload.new.created_at,
                 );
               }
+            } else {
+              addMessage(
+                messageText,
+                "system",
+                null,
+                false,
+                payload.new.created_at,
+              );
             }
           }
         },
@@ -629,8 +627,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       behavior: 'smooth'
     });
 
-    if (save) {
+    if (save === true) {
       saveMessageToSupabase(text, type, htmlContent, msgDiv);
+      return; // Garante que não execute renderização dupla se já foi impressa
     }
   }
 
@@ -809,12 +808,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   window.loadExistingMessages = loadExistingMessages;
 
-  // Polling de segurança para garantir que mensagens cheguem mesmo sem Realtime
-  setInterval(() => {
-    if (isLiveChat && window.supabaseClient) {
-      loadExistingMessages();
-    }
-  }, 3000);
 
   // Fluxo Inicial
   async function initChat() {
