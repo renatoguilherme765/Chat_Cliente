@@ -1045,7 +1045,22 @@ document.addEventListener("DOMContentLoaded", async () => {
               `Obrigado, ${userName}! Consultando condições disponíveis...`,
               "system",
             );
-            // Bot para aqui e aguarda.
+
+            setTimeout(() => {
+              if (!optionsDisplayed) { // Trava de estado
+                const options = `
+                                <p>Opções disponíveis:</p>
+                                <div class="btn-container">
+                                    <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
+                                    <button class="chat-btn" onclick="handleAction('renegociacao_carencia')">2️⃣ Renegociação com carência de até 90 dias</button>
+                                    <button class="chat-btn" onclick="handleAction('entrega_amigavel')">3️⃣ Entrega amigável do Veículo</button>
+                                    <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
+                                </div>
+                            `;
+                addMessage(null, "system", options);
+                optionsDisplayed = true;
+              }
+            }, 1000); // 1 segundo de atraso conforme solicitado
           }, 800);
         }
       } else {
