@@ -324,7 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Inicializa a verificação do cliente assim que abre o chat
-  // createClientIfNotExists();
+  createClientIfNotExists();
 
   // 2 e 4. Salvar mensagens no Supabase
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
@@ -836,7 +836,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setTimeout(() => {
         const msg =
           "Olá 👋<br><br>Você está em um ambiente seguro para negociação do seu contrato.<br><br>Para continuar o atendimento, digite seu CPF ou CNPJ apenas com números.";
-        addMessage(null, "system", msg, false);
+        addMessage(null, "system", msg);
         currentStep = "cpf_whatsapp";
       }, 500);
     } else {
@@ -845,8 +845,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         addMessage(
           "Olá 👋 Identificamos uma condição especial para regularização do seu contrato.",
           "system",
-          null,
-          false
         );
 
         setTimeout(() => {
@@ -860,7 +858,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                             </div>
                         </div>
                     `;
-          addMessage(null, "system", cardHtml, false);
+          addMessage(null, "system", cardHtml);
         }, 1000);
       }, 500);
     }
