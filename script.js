@@ -385,8 +385,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           filter: `client_id=eq.${clientId}`,
         },
         (payload) => {
-          // 1. DESATIVE O ECO: Apenas mostrar mensagens onde o 'sender' seja 'specialist'
-          // 4. FILTRO DE INSCRIPTION: Ignorar mensagens que o próprio cliente acabou de inserir (sender 'client')
+          // 1. FILTRO DE REALTIME: Ignorar mensagens cujo 'sender' seja 'bot' ou 'client'.
+          // Renderizar na tela APENAS mensagens vindas do 'specialist'.
           if (payload.new.sender === "specialist") {
             const messageText = payload.new.text || payload.new.content || '';
             
