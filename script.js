@@ -214,7 +214,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentStep = "start";
   let isLiveChat = false;
   let userName = "";
-  let optionsDisplayed = false; // Trava para evitar repetição do menu
 
   // Capturar telefone da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -275,78 +274,72 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 3. Criar cliente na tabela chat_clients
   let clientCreated = false;
-  let isSaving = false; // Trava de controle para evitar cliques múltiplos
   let createClientPromise = null;
 
-  async function createClientAndSaveHistory(name, cpfCnpj) {
-    if (!window.supabaseClient || clientCreated || isSaving) return;
-    
-    isSaving = true; // Ativa a trava
+  async function createClientIfNotExists() {
+    if (!window.supabaseClient || clientCreated) return;
 
+    if (!createClientPromise) {
+      createClientPromise = (async () => {
+        try {
+          if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
+            alert("Erro: Empresa não identificada");
+            return;
+          }
+
+          const { data, error: selectError } = await window.supabaseClient
+            .from("chat_clients")
+            .select("id")
+            .eq("id", clientId)
+            .eq("tenant_id", tenantId);
+
+          if (selectError) throw selectError;
+
+          if (!data || data.length === 0) {
+            // 1. Usar userName se disponível, senão "Cliente"
+            const insertData = {
+              id: clientId,
+              name: userName || "Cliente",
+              status: "aguardando",
+              tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+            };
+
+            if (telefoneCliente) {
+              insertData.telefone = telefoneCliente;
+            }
+
+            const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
+            if (insertError) throw insertError;
+          }
+          clientCreated = true;
+        } catch (error) {
+          // 2 e 3. Try/Catch e Alert
+          alert("Erro no Supabase: " + error.message);
+          customAlert("Erro no Supabase (Criar Cliente): " + error.message);
+          clientCreated = false; // Permite tentar novamente
+        }
+      })();
+    }
+    await createClientPromise;
+  }
+
+  // Inicializa a verificação do cliente assim que abre o chat
+  // createClientIfNotExists();
+
+  // 2 e 4. Salvar mensagens no Supabase
+  async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
+    if (!window.supabaseClient) return;
+    
     try {
       if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
         alert("Erro: Empresa não identificada");
-        isSaving = false;
         return;
       }
+      if (!clientId) throw new Error("clientId está vazio.");
 
-      // 1. Cadastrar cliente
-      const insertData = {
-        id: clientId,
-        name: name || "Cliente",
-        cpf_cnpj: cpfCnpj || "",
-        status: "aguardando",
-        tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
-      };
+      await createClientIfNotExists();
 
-      if (telefoneCliente) {
-        insertData.telefone = telefoneCliente;
-      }
-
-      const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
-      if (insertError) throw insertError;
-
-      // 2. Salvar histórico de mensagens (Filtrado conforme solicitado)
-      const messagesToSave = [];
-      const messageElements = chatArea.querySelectorAll('.message');
-      
-      messageElements.forEach(msgDiv => {
-        const text = msgDiv.querySelector('.message-text')?.textContent || "";
-        const isUser = msgDiv.classList.contains('user-msg');
-        
-        // Filtro de envio: [Mensagem do Bot, CPF do Cliente, Nome do Cliente, Opção Escolhida]
-        // Simplificado para capturar o contexto relevante
-        messagesToSave.push({
-          client_id: clientId,
-          tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
-          text: text,
-          sender: isUser ? "client" : "system",
-          created_at: new Date().toISOString()
-        });
-      });
-
-      if (messagesToSave.length > 0) {
-        const { error: msgError } = await window.supabaseClient.from("chat_messages").insert(messagesToSave);
-        if (msgError) throw msgError;
-      }
-
-      clientCreated = true;
-      // Resposta Final: Apenas esta mensagem deve aparecer na tela após o clique
-      addMessage("Aguarde um instante, você será conectado a um especialista.", "system", null, false);
-      
-    } catch (error) {
-      console.error("Erro ao persistir histórico:", error);
-      alert("Erro ao conectar com especialista: " + error.message);
-    } finally {
-      isSaving = false; // Libera a trava
-    }
-  }
-
-  // 2 e 4. Salvar mensagens no Supabase (apenas se já criado)
-  async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient || !clientCreated) return;
-    
-    try {
+      // 5. Garantir que sender seja 'client'
       let sender = type === "user" ? "client" : "system";
       let messageText = text || htmlContent;
 
@@ -361,13 +354,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
       ]);
 
-      if (error) throw error;
-      
-      if (msgDiv && msgDiv._statusSpan) {
+      if (error) {
+        throw error;
+      } else if (msgDiv && msgDiv._statusSpan) {
+        // Ícone de check (enviado)
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
         msgDiv._statusSpan.style.opacity = "1";
+        msgDiv._statusSpan.title = "Enviada";
       }
     } catch (err) {
+      // 2 e 3. Try/Catch e Alert
+      alert("Erro no Supabase: " + err.message);
+      customAlert("Erro no Supabase (Salvar Mensagem): " + err.message);
       console.error("Erro ao salvar mensagem no Supabase:", err);
     }
   }
@@ -826,8 +824,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     sendBtn.disabled = false;
 
     // Tentar carregar histórico se for cliente retornando
-    // REMOVED: isReturningClient check
-
+    if (isReturningClient) {
+      const hasHistory = await loadExistingMessages();
+      if (hasHistory) {
+        return; // Se já tem histórico, não roda o fluxo inicial de boas vindas
+      }
+    }
 
     if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
       // Fluxo Automático (WhatsApp ou /negociar)
@@ -865,7 +867,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Manipulador de Ações de Botões
-  window.handleAction = async (action) => {
+  window.handleAction = (action) => {
     if (action === "ver_condicoes") {
       addMessage("Ver condições", "user");
       currentStep = "cpf";
@@ -909,7 +911,17 @@ document.addEventListener("DOMContentLoaded", async () => {
           isLiveChat = true;
 
           if (window.supabaseClient) {
-            await createClientAndSaveHistory(userName, window.userCpf);
+            await createClientIfNotExists();
+              await window.supabaseClient.from("chat_messages").insert([
+                {
+                  client_id: clientId,
+                  tenant_id: tenantId,
+                  specialist_id: null,
+                  text: "⚠️ O cliente solicitou uma renegociação. Assuma o atendimento e envie as condições.",
+                  sender: "client",
+                  created_at: new Date(),
+                },
+              ]);
             await window.supabaseClient
               .from("chat_clients")
               .update({ status: "aguardando" })
@@ -934,18 +946,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       }, 800);
     } else if (action === "falar_especialista") {
       addMessage("4️⃣ Falar com um especialista", "user");
-      
-      // A lógica de persistência e a mensagem de "Aguarde" já estão dentro de createClientAndSaveHistory
-      isLiveChat = true;
+      setTimeout(async () => {
+        addMessage(
+          "Aguarde um instante, você será conectado a um especialista.",
+          "system",
+        );
+        isLiveChat = true;
 
-      if (window.supabaseClient) {
-        await createClientAndSaveHistory(userName, window.userCpf);
-        await window.supabaseClient
-          .from("chat_clients")
-          .update({ status: "aguardando" })
-          .eq("id", clientId);
-        // window.loadExistingMessages(); // Removido para evitar loop/reimpressão
-      }
+        if (window.supabaseClient) {
+          await createClientIfNotExists();
+          await window.supabaseClient
+            .from("chat_clients")
+            .update({ status: "aguardando" })
+            .eq("id", clientId);
+          window.loadExistingMessages();
+        }
+      }, 800);
     } else if (action === "gerar_boleto") {
       addMessage("Gerar boleto com desconto", "user");
       setTimeout(() => {
@@ -974,7 +990,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           setTimeout(async () => {
             isLiveChat = true;
             if (window.supabaseClient) {
-              await createClientAndSaveHistory(userName, window.userCpf);
+              await createClientIfNotExists();
+              // Envia uma mensagem para o especialista (aparecerá no painel como se fosse do cliente)
+              await window.supabaseClient.from("chat_messages").insert([
+                {
+                  client_id: clientId,
+                  tenant_id: tenantId,
+                  specialist_id: null,
+                  text: "⚠️ O cliente solicitou a geração do boleto com desconto. Assuma o atendimento para enviar os valores e o boleto.",
+                  sender: "client",
+                  created_at: new Date(),
+                },
+              ]);
               await window.supabaseClient
                 .from("chat_clients")
                 .update({ status: "aguardando" })
@@ -1036,15 +1063,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
       userName = text.trim();
       if (userName.length >= 2) {
-        currentStep = "nome_recebido"; // Atualiza o passo imediatamente
+        // Atualiza o nome e CPF do cliente no Supabase
+        if (window.supabaseClient) {
+          try {
+            const { error: updateError } = await window.supabaseClient
+              .from("chat_clients")
+              .update({
+                name: userName,
+                cpf_cnpj: window.userCpf || "",
+                status: "aguardando"
+              })
+              .eq("id", clientId)
+              .eq("tenant_id", tenantId);
+              
+            if (updateError) throw updateError;
+          } catch (err) {
+            console.error("Erro ao atualizar nome do cliente:", err);
+            alert("Erro ao atualizar nome: " + err.message);
+          }
+        }
 
         if (currentStep === "nome_whatsapp") {
           setTimeout(async () => {
             const msg = `Obrigado. Você está sendo conectado a um especialista.`;
             addMessage(null, "system", msg);
+            currentStep = "nome_recebido";
             isLiveChat = true;
-            // Apenas aqui chamamos o Supabase
-            await createClientAndSaveHistory(userName, window.userCpf);
+
+            if (window.supabaseClient) {
+              await createClientIfNotExists();
+              await window.supabaseClient
+                .from("chat_clients")
+                .update({ status: "em_atendimento" })
+                .eq("id", clientId);
+            }
           }, 800);
         } else {
           setTimeout(() => {
@@ -1054,8 +1106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             );
 
             setTimeout(() => {
-              if (!optionsDisplayed) { // Trava de estado
-                const options = `
+              const options = `
                                 <p>Opções disponíveis:</p>
                                 <div class="btn-container">
                                     <button class="chat-btn" onclick="handleAction('pagamento_total')">1️⃣ Pagamento total da(s) parcela(s)</button>
@@ -1064,10 +1115,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                                     <button class="chat-btn secondary" onclick="handleAction('falar_especialista')">4️⃣ Falar com um especialista</button>
                                 </div>
                             `;
-                addMessage(null, "system", options);
-                optionsDisplayed = true;
-              }
-            }, 1000); // 1 segundo de atraso conforme solicitado
+              addMessage(null, "system", options);
+              currentStep = "nome_recebido";
+            }, 1500);
           }, 800);
         }
       } else {
