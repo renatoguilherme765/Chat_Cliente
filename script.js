@@ -95,9 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
   
-  // ID REAL da empresa ml-gomes
-  let tenantId = '0be66bb8-16e6-47e3-9813-73ee9d5ff16d';
-  localStorage.setItem("tenant_id", tenantId);
+  let tenantId = localStorage.getItem("tenant_id") || '0be66bb8-16e6-47e3-9813-73ee9d5ff16d';
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -114,42 +112,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     headerTitle.textContent = formatCompanyName(slug_da_url);
   }
 
-  // Buscar dados da empresa (incluindo logo_url) no Supabase
-  if (window.supabaseClient) {
-    window.supabaseClient
-      .from("tenants")
-      .select("logo_url")
-      .eq("id", tenantId)
-      .single()
-      .then(({ data, error }) => {
-        if (!error && data && data.logo_url) {
-          const profilePic = document.querySelector(".profile-pic");
-          if (profilePic) {
-            // Renderização condicional: substitui o src pelo logo_url
-            profilePic.src = data.logo_url;
-            profilePic.style.backgroundColor = "transparent";
-            profilePic.style.objectFit = "cover";
-          }
-        }
-      });
-  }
-
   console.log("Slug capturado da URL:", slug_da_url);
 
-  // VALIDAÇÃO DESATIVADA PARA TESTES
-  /*
-  if (!slug_da_url || slug_da_url.toLowerCase() === 'index.html') {
-    document.body.innerHTML = `
-            <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#333;background:#f5f5f5;text-align:center;padding:20px;">
-                <h1 style="font-size:24px;margin-bottom:10px;">Bem-vindo ao Sistema</h1>
-                <p style="font-size:16px;">Por favor, acesse através do link específico da sua empresa.</p>
-            </div>
-        `;
-    return;
-  }
-  */
-
-  /*
+  // VALIDAÇÃO E BUSCA DE DADOS DA EMPRESA (TENANT)
   if (slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
     const searchSlug = slug_da_url.toLowerCase();
     console.log("Buscando no banco o slug:", searchSlug);
@@ -158,27 +123,49 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { data: tenantData, error: tenantError } =
         await window.supabaseClient
           .from("tenants")
-          .select("*")
+          .select("id, slug, logo_url") // <-- Adicionado logo_url
           .ilike("slug", searchSlug)
           .single();
 
       if (tenantError || !tenantData) {
         console.error("Erro ao buscar tenant:", tenantError?.message);
-        alert("Erro: Empresa não identificada");
-        return; // Interrompe a execução
+        // alert("Erro: Empresa não identificada"); // Mantido comentado para não travar testes
+      } else {
+        tenantId = tenantData.id;
+        localStorage.setItem("tenant_id", tenantId);
+
+        // Renderização Condicional da Logo (Vanilla JS)
+        if (tenantData.logo_url) {
+          const profilePic = document.querySelector(".profile-pic");
+          if (profilePic) {
+            profilePic.src = tenantData.logo_url;
+            profilePic.style.backgroundColor = "transparent";
+            profilePic.style.objectFit = "cover";
+            profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
+          }
+        }
       }
-      
-      tenantId = tenantData.id;
-      localStorage.setItem("tenant_id", tenantId);
     }
   } else {
-    // Se não tiver slug na URL, verifica se tem no localStorage e se é válido
-    if (!tenantId || tenantId === "00000000-0000-0000-0000-000000000000") {
-      alert("Erro: Empresa não identificada");
-      return; // Interrompe a execução
+    // Fallback caso não tenha slug na URL, busca a logo pelo tenantId salvo
+    if (window.supabaseClient && tenantId && tenantId !== "00000000-0000-0000-0000-000000000000") {
+      const { data } = await window.supabaseClient
+        .from("tenants")
+        .select("logo_url")
+        .eq("id", tenantId)
+        .single();
+        
+      if (data && data.logo_url) {
+        const profilePic = document.querySelector(".profile-pic");
+        if (profilePic) {
+          profilePic.src = data.logo_url;
+          profilePic.style.backgroundColor = "transparent";
+          profilePic.style.objectFit = "cover";
+          profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
+        }
+      }
     }
   }
-  */
 
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
