@@ -114,6 +114,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     headerTitle.textContent = formatCompanyName(slug_da_url);
   }
 
+  // Buscar dados da empresa (incluindo logo_url) no Supabase
+  if (window.supabaseClient) {
+    window.supabaseClient
+      .from("tenants")
+      .select("logo_url")
+      .eq("id", tenantId)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data && data.logo_url) {
+          const profilePic = document.querySelector(".profile-pic");
+          if (profilePic) {
+            // Renderização condicional: substitui o src pelo logo_url
+            profilePic.src = data.logo_url;
+            profilePic.style.backgroundColor = "transparent";
+            profilePic.style.objectFit = "cover";
+          }
+        }
+      });
+  }
+
   console.log("Slug capturado da URL:", slug_da_url);
 
   // VALIDAÇÃO DESATIVADA PARA TESTES
