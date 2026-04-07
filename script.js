@@ -1,3 +1,10 @@
+/**
+ * @typedef {Object} Tenant
+ * @property {string} id
+ * @property {string} slug
+ * @property {string} [logo_url] - URL da logo da empresa (opcional)
+ */
+
 document.addEventListener("DOMContentLoaded", async () => {
   localStorage.clear();
   // Função para forçar o download de imagens
@@ -134,14 +141,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         tenantId = tenantData.id;
         localStorage.setItem("tenant_id", tenantId);
 
-        // Renderização Condicional da Logo (Vanilla JS)
+        // Renderização Condicional da Logo (Vanilla JS substituindo JSX)
         if (tenantData.logo_url) {
           const profilePic = document.querySelector(".profile-pic");
           if (profilePic) {
             profilePic.src = tenantData.logo_url;
-            profilePic.style.backgroundColor = "transparent";
+            // Aplicando as classes exatas solicitadas (w-10 h-10 rounded-full object-cover border border-white/20 bg-white)
+            profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
+            profilePic.style.backgroundColor = "white";
             profilePic.style.objectFit = "cover";
             profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
+            profilePic.style.borderRadius = "9999px";
+            profilePic.style.width = "40px";
+            profilePic.style.height = "40px";
           }
         }
       }
@@ -159,9 +171,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         const profilePic = document.querySelector(".profile-pic");
         if (profilePic) {
           profilePic.src = data.logo_url;
-          profilePic.style.backgroundColor = "transparent";
+          // Aplicando as classes exatas solicitadas
+          profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
+          profilePic.style.backgroundColor = "white";
           profilePic.style.objectFit = "cover";
           profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
+          profilePic.style.borderRadius = "9999px";
+          profilePic.style.width = "40px";
+          profilePic.style.height = "40px";
         }
       }
     }
