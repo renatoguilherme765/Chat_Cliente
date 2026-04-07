@@ -133,7 +133,7 @@ body, html {
 
 .system-msg {
     align-self: flex-start;
-    background-color: #d9fdd3; /* Verde claro WhatsApp */
+    background-color: #ffffff; /* Branco */
     color: #000000 !important;
     border-top-left-radius: 0;
 }
@@ -145,13 +145,13 @@ body, html {
     left: -8px;
     width: 0;
     height: 0;
-    border-top: 10px solid #d9fdd3;
+    border-top: 10px solid #ffffff;
     border-left: 10px solid transparent;
 }
 
 .user-msg {
     align-self: flex-end;
-    background-color: #ffffff; /* Branco */
+    background-color: #d9fdd3; /* Verde claro WhatsApp */
     color: #000000 !important;
     border-top-right-radius: 0;
 }
@@ -163,7 +163,7 @@ body, html {
     right: -8px;
     width: 0;
     height: 0;
-    border-top: 10px solid #ffffff;
+    border-top: 10px solid #d9fdd3;
     border-right: 10px solid transparent;
 }
 
