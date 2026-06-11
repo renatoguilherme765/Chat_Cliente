@@ -67,10 +67,9 @@ async function selectClient(id, nome, telefone, status = 'aguardando', ownerId =
     
     // Se for live chat, verificar status no banco p/ garantir state mais recente
     if (window.supabaseClient) {
-        const { data: fetchChat } = await window.supabaseClient.from('chat_clients').select('status, specialist_id').eq('id', id).single();
+        const { data: fetchChat } = await window.supabaseClient.from('chat_clients').select('status').eq('id', id).single().catch(() => ({}));
         if (fetchChat) {
             status = fetchChat.status;
-            ownerId = fetchChat.specialist_id;
         }
     }
 
@@ -83,9 +82,11 @@ async function selectClient(id, nome, telefone, status = 'aguardando', ownerId =
             </button>
         `;
         document.getElementById('btnAtenderChat').onclick = async () => {
+            const updatePayload = { status: 'em_atendimento' };
+
             const { data, error } = await window.supabaseClient
                 .from('chat_clients')
-                .update({ status: 'em_atendimento', specialist_id: mySpecialistId })
+                .update(updatePayload)
                 .eq('id', id)
                 .eq('status', 'aguardando')
                 .select();
@@ -181,15 +182,21 @@ function setupInputListeners() {
                 .from('Chat_attachments')
                 .getPublicUrl(filePath);
 
+            const msgPayload = {
+                client_id: activeClientId,
+                sender: 'system',
+                text: data.publicUrl,
+                created_at: new Date()
+            };
+            
+            const isValidUUID = (uuid) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+            if (tenantId && isValidUUID(tenantId) && tenantId !== '00000000-0000-0000-0000-000000000000') {
+                msgPayload.tenant_id = tenantId;
+            }
+
+            console.log("Inserindo anexo em chat_messages:", msgPayload);
             if (data && data.publicUrl) {
-                await window.supabaseClient.from('chat_messages').insert({
-                    client_id: activeClientId,
-                    specialist_id: specialistId,
-                    tenant_id: tenantId,
-                    sender: 'system',
-                    text: data.publicUrl,
-                    created_at: new Date()
-                });
+                await window.supabaseClient.from('chat_messages').insert([msgPayload]).catch(() => ({}));
                 renderMessages();
             }
             
@@ -204,14 +211,21 @@ function setupInputListeners() {
             const specialistId = localStorage.getItem('specialist_id') || '00000000-0000-0000-0000-000000000000';
             if (window.supabaseClient) {
                 const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
-                await window.supabaseClient.from('chat_messages').insert({
+                
+                const msgPayload = {
                     client_id: activeClientId,
-                    specialist_id: specialistId,
-                    tenant_id: tenantId,
                     sender: 'system',
                     text: text,
                     created_at: new Date()
-                });
+                };
+                
+                const isValidUUID = (uuid) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+                if (tenantId && isValidUUID(tenantId) && tenantId !== '00000000-0000-0000-0000-000000000000') {
+                    msgPayload.tenant_id = tenantId;
+                }
+
+                console.log("Inserindo mensagem em chat_messages (especialista):", msgPayload);
+                await window.supabaseClient.from('chat_messages').insert([msgPayload]).catch(() => ({}));
             } else {
                 let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
                 if (chats[activeClientId]) {

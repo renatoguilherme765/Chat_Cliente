@@ -307,6 +307,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             messagePayload.tenant_id = insertData.tenant_id;
         }
 
+        console.log("Inserindo mensagem no histórico:", messagePayload);
         await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
 
         // 2. MARCAÇÃO DE TEMPO: Delay de 100ms
@@ -343,6 +344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         messagePayload.tenant_id = tenantId;
       }
 
+      console.log("Inserindo mensagem no chat_messages:", messagePayload);
       const { error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
       if (error) console.warn("Aviso ao salvar mensagem:", error);
       
