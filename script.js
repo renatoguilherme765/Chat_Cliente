@@ -268,29 +268,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     isProcessing = true; // Ativa a trava
 
     try {
-      if (!tenantId || tenantId === "null" || tenantId === "undefined" || tenantId === "00000000-0000-0000-0000-000000000000") {
-        alert("Erro: Empresa não identificada");
-        isProcessing = false;
-        return;
-      }
-
       // 1. Cadastrar cliente com UPSERT robusto
       const insertData = {
         id: clientId,
         name: name || "Cliente",
         cpf_cnpj: cpfCnpj || "",
         status: "aguardando",
-        tenant_id: tenantId,
-        specialist_id: null,
         created_at: new Date().toISOString()
       };
+
+      const isValidUUID = (uuid) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+      if (tenantId && isValidUUID(tenantId) && tenantId !== "00000000-0000-0000-0000-000000000000") {
+        insertData.tenant_id = tenantId;
+      }
 
       if (telefoneCliente) {
         insertData.telefone = telefoneCliente;
       }
 
-      const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]);
-      if (insertError) throw insertError;
+      const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]).catch(() => ({}));
+      if (insertError) console.warn("Aviso ao persistir histórico:", insertError.message);
 
       // 2. ENVIO EM SEQUÊNCIA (PROMISE CHAIN)
       const messageElements = chatArea.querySelectorAll('.message');
@@ -301,14 +298,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         const messagePayload = {
           client_id: clientId,
-          tenant_id: tenantId,
           text: text,
           sender: isUser ? "client" : "system",
           created_at: new Date().toISOString()
         };
 
-        const { error: msgError } = await window.supabaseClient.from("chat_messages").insert([messagePayload]);
-        if (msgError) throw msgError;
+        if (insertData.tenant_id) {
+            messagePayload.tenant_id = insertData.tenant_id;
+        }
+
+        await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
 
         // 2. MARCAÇÃO DE TEMPO: Delay de 100ms
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -317,8 +316,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       clientCreated = true;
       
     } catch (error) {
-      console.error("Erro ao persistir histórico:", error);
-      alert("Erro ao conectar com especialista: " + error.message);
+      console.error("Erro silencioso ao persistir histórico:", error);
     } finally {
       isProcessing = false; // Libera a trava
     }
@@ -334,23 +332,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       localMessages.add(messageText);
 
-      const { error } = await window.supabaseClient.from("chat_messages").insert([
-        {
+      const messagePayload = {
           client_id: clientId,
-          tenant_id: tenantId,
           text: messageText,
           sender: sender
-        },
-      ]);
+      };
 
-      if (error) throw error;
+      const isValidUUID = (uuid) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+      if (tenantId && isValidUUID(tenantId) && tenantId !== "00000000-0000-0000-0000-000000000000") {
+        messagePayload.tenant_id = tenantId;
+      }
+
+      const { error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
+      if (error) console.warn("Aviso ao salvar mensagem:", error);
       
       if (msgDiv && msgDiv._statusSpan) {
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
         msgDiv._statusSpan.style.opacity = "1";
       }
     } catch (err) {
-      console.error("Erro ao salvar mensagem no Supabase:", err);
+      console.error("Erro silencioso ao salvar mensagem no Supabase:", err);
     }
   }
 
@@ -882,16 +883,21 @@ document.addEventListener("DOMContentLoaded", async () => {
           "Estamos analisando a proposta de renegociação com carência de até 90 dias. Aguarde um instante enquanto verificamos as condições disponíveis.",
           "system",
         );
-        setTimeout(async () => {
+        setTimeout(() => {
           addMessage("Você será redirecionado para um especialista.", "system");
           isLiveChat = true;
 
           if (window.supabaseClient) {
-            await createClientAndSaveHistory(userName, window.userCpf);
-            await window.supabaseClient
-              .from("chat_clients")
-              .update({ status: "aguardando" })
-              .eq("id", clientId);
+            createClientAndSaveHistory(userName, window.userCpf)
+              .then(() => {
+                return window.supabaseClient
+                  .from("chat_clients")
+                  .update({ status: "aguardando" })
+                  .eq("id", clientId);
+              })
+              .catch(err => {
+                console.warn("Falha silenciosa ao atualizar status:", err);
+              });
           }
         }, 1500);
       }, 800);
@@ -918,13 +924,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (window.supabaseClient) {
         addMessage("Aguarde, um especialista está sendo chamado...", "system", null, false);
         
-        await createClientAndSaveHistory(userName, window.userCpf);
-        
-        // Garante a sinalização no painel
-        await window.supabaseClient
-          .from("chat_clients")
-          .update({ status: "aguardando", specialist_id: null })
-          .eq("id", clientId);
+        createClientAndSaveHistory(userName, window.userCpf)
+          .then(() => {
+            // Garante a sinalização no painel
+            return window.supabaseClient
+              .from("chat_clients")
+              .update({ status: "aguardando" })
+              .eq("id", clientId);
+          })
+          .catch(err => {
+            console.warn("Falha silenciosa ao chamar especialista:", err);
+          });
       }
     } else if (action === "gerar_boleto") {
       addMessage("Gerar boleto com desconto", "user");
@@ -951,14 +961,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                     `;
           addMessage(null, "system", content);
 
-          setTimeout(async () => {
+          setTimeout(() => {
             isLiveChat = true;
             if (window.supabaseClient) {
-              await createClientAndSaveHistory(userName, window.userCpf);
-              await window.supabaseClient
-                .from("chat_clients")
-                .update({ status: "aguardando" })
-                .eq("id", clientId);
+              createClientAndSaveHistory(userName, window.userCpf)
+                .then(() => {
+                  return window.supabaseClient
+                    .from("chat_clients")
+                    .update({ status: "aguardando" })
+                    .eq("id", clientId);
+                })
+                .catch(err => {
+                  console.warn("Falha silenciosa ao atualizar status:", err);
+                });
             }
           }, 1000);
         }, 1000);
