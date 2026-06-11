@@ -37,7 +37,7 @@ function updateClientListUI(liveClients) {
         const telefone = chat.telefone || chat.phone ? (chat.telefone || chat.phone) : 'Sem telefone';
         
         div.innerHTML = `<strong>${nome}</strong><br><small>${telefone}</small>`;
-        div.onclick = () => selectClient(chat.id, nome, telefone);
+        div.onclick = () => selectClient(chat.id, nome, telefone, chat.status, chat.specialist_id);
         clientList.appendChild(div);
         
         // Atualiza o cabeçalho se o cliente ativo teve o nome alterado
@@ -48,9 +48,8 @@ function updateClientListUI(liveClients) {
     });
 }
 
-async function selectClient(id, nome, telefone) {
+async function selectClient(id, nome, telefone, status = 'aguardando', ownerId = null) {
     activeClientId = id;
-    document.getElementById('chatInputArea').style.display = 'flex';
     
     // Se não for passado (caso do localStorage antigo), tenta pegar do chat
     if (!nome && !window.supabaseClient) {
@@ -61,10 +60,179 @@ async function selectClient(id, nome, telefone) {
 
     const identifier = nome ? nome : 'Cliente Anônimo';
     const phoneDisplay = telefone !== 'Sem telefone' ? `<br><small style="font-weight: normal; font-size: 13px; color: #667781;">${telefone}</small>` : '';
-    document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}${phoneDisplay}</h2>`;
+    document.getElementById('chatHeader').innerHTML = `<h2>Processando: ${identifier}${phoneDisplay}</h2>`;
+    
+    const inputArea = document.getElementById('chatInputArea');
+    const mySpecialistId = localStorage.getItem('specialist_id') || '00000000-0000-0000-0000-000000000000';
+    
+    // Se for live chat, verificar status no banco p/ garantir state mais recente
+    if (window.supabaseClient) {
+        const { data: fetchChat } = await window.supabaseClient.from('chat_clients').select('status, specialist_id').eq('id', id).single();
+        if (fetchChat) {
+            status = fetchChat.status;
+            ownerId = fetchChat.specialist_id;
+        }
+    }
+
+    if (status === 'aguardando') {
+        document.getElementById('chatHeader').innerHTML = `<h2>Visualizando: ${identifier}${phoneDisplay}</h2>`;
+        inputArea.style.display = 'flex';
+        inputArea.innerHTML = `
+            <button id="btnAtenderChat" style="width:100%; padding:15px; background:#008069; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">
+                ASSUMIR ATENDIMENTO (Atender)
+            </button>
+        `;
+        document.getElementById('btnAtenderChat').onclick = async () => {
+            const { data, error } = await window.supabaseClient
+                .from('chat_clients')
+                .update({ status: 'em_atendimento', specialist_id: mySpecialistId })
+                .eq('id', id)
+                .eq('status', 'aguardando')
+                .select();
+                
+            if (error) {
+                alert("Erro ao tentar atender cliente: " + error.message);
+                return;
+            }
+            if (!data || data.length === 0) {
+                alert("Este cliente já foi assumido por outro especialista.");
+                renderClients();
+                document.getElementById('chatInputArea').style.display = 'none';
+                return;
+            }
+            // Sucesso
+            restoreInputArea();
+            document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}${phoneDisplay}</h2>`;
+            renderClients();
+        };
+    } else if (status === 'em_atendimento') {
+        if (ownerId && ownerId !== mySpecialistId) {
+            document.getElementById('chatHeader').innerHTML = `<h2>Visualizando (Ocupado): ${identifier}${phoneDisplay}</h2>`;
+            inputArea.style.display = 'flex';
+            inputArea.innerHTML = `
+                <div style="width:100%; text-align:center; padding:15px; color:#888;">
+                    Este alerta está em atendimento por outro especialista.
+                </div>
+            `;
+        } else {
+            document.getElementById('chatHeader').innerHTML = `<h2>Atendendo: ${identifier}${phoneDisplay}</h2>`;
+            restoreInputArea();
+        }
+    } else {
+        restoreInputArea();
+    }
     
     await renderMessages();
     renderClients();
+}
+
+function restoreInputArea() {
+    const inputArea = document.getElementById('chatInputArea');
+    inputArea.style.display = 'flex';
+    inputArea.innerHTML = `
+        <input type="file" id="agentFileInput" style="display: none;">
+        <button id="agentAttachBtn" onclick="document.getElementById('agentFileInput').click()" style="background: none; border: none; cursor: pointer; color: #008069; padding: 0 10px; font-size: 20px;">
+            📎
+        </button>
+        <input type="text" id="agentInput" placeholder="Digite sua mensagem para o cliente..." autocomplete="off">
+        <button id="agentSendBtn">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+            </svg>
+            Enviar
+        </button>
+    `;
+    // Re-attach listeners based on the restored HTML
+    setupInputListeners();
+}
+
+// Criar a função setupInputListeners para recasar os eventos
+function setupInputListeners() {
+    const agentFileInput = document.getElementById('agentFileInput');
+    const agentSendBtn = document.getElementById('agentSendBtn');
+    const agentInput = document.getElementById('agentInput');
+    
+    // Anexar anexo
+    if (agentFileInput) {
+        agentFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !activeClientId) return;
+
+            if (!window.supabaseClient) {
+                alert("Upload indisponível no modo local/fallback (sem Supabase).");
+                return;
+            }
+
+            const specialistId = localStorage.getItem('specialist_id') || '00000000-0000-0000-0000-000000000000';
+            const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
+            const filePath = `${activeClientId}/${Date.now()}_${file.name}`;
+
+            const { error } = await window.supabaseClient.storage
+                .from('Chat_attachments')
+                .upload(filePath, file);
+
+            if (error) {
+                console.error("Erro no upload:", error);
+                alert("Erro ao enviar arquivo.");
+                return;
+            }
+
+            const { data } = window.supabaseClient.storage
+                .from('Chat_attachments')
+                .getPublicUrl(filePath);
+
+            if (data && data.publicUrl) {
+                await window.supabaseClient.from('chat_messages').insert({
+                    client_id: activeClientId,
+                    specialist_id: specialistId,
+                    tenant_id: tenantId,
+                    sender: 'system',
+                    text: data.publicUrl,
+                    created_at: new Date()
+                });
+                renderMessages();
+            }
+            
+            agentFileInput.value = ''; // Reset input
+        });
+    }
+
+    if (agentSendBtn && agentInput) {
+        agentSendBtn.onclick = async () => {
+            const text = agentInput.value.trim();
+            if (!text || !activeClientId) return;
+            const specialistId = localStorage.getItem('specialist_id') || '00000000-0000-0000-0000-000000000000';
+            if (window.supabaseClient) {
+                const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
+                await window.supabaseClient.from('chat_messages').insert({
+                    client_id: activeClientId,
+                    specialist_id: specialistId,
+                    tenant_id: tenantId,
+                    sender: 'system',
+                    text: text,
+                    created_at: new Date()
+                });
+            } else {
+                let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
+                if (chats[activeClientId]) {
+                    chats[activeClientId].messages.push({
+                        content: text,
+                        type: 'specialist',
+                        htmlContent: null
+                    });
+                    localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
+                }
+            }
+            agentInput.value = '';
+            renderMessages();
+        };
+
+        agentInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                agentSendBtn.click();
+            }
+        });
+    }
 }
 
 async function renderMessages() {
@@ -314,98 +482,6 @@ setInterval(() => {
     renderClients();
     renderMessages();
 }, 3000);
-
-// Envio de arquivo pelo agente
-const agentFileInput = document.getElementById('agentFileInput');
-if (agentFileInput) {
-    agentFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file || !activeClientId) return;
-
-        if (!window.supabaseClient) {
-            alert("Supabase não configurado.");
-            return;
-        }
-
-        const filePath = `${activeClientId}/${Date.now()}_${file.name}`;
-        
-        // Upload the file
-        const { error } = await window.supabaseClient.storage
-            .from('Chat_attachments')
-            .upload(filePath, file);
-
-        if (error) {
-            console.error('Erro no upload:', error);
-            alert('Erro ao enviar arquivo.');
-            return;
-        }
-
-        // Get public URL
-        const { data } = window.supabaseClient.storage
-            .from('Chat_attachments')
-            .getPublicUrl(filePath);
-
-        if (data && data.publicUrl) {
-            const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
-            await window.supabaseClient.from('chat_messages').insert({
-                client_id: activeClientId,
-                specialist_id: specialistId,
-                tenant_id: tenantId,
-                sender: 'system',
-                text: data.publicUrl,
-                created_at: new Date()
-            });
-            await window.supabaseClient.from('chat_clients').update({ 
-                status: 'em_atendimento',
-                specialist_id: specialistId 
-            }).eq('id', activeClientId);
-            renderMessages();
-        }
-        
-        agentFileInput.value = ''; // Reset input
-    });
-}
-
-// Envio de mensagem pelo agente
-document.getElementById('agentSendBtn').onclick = async () => {
-    const input = document.getElementById('agentInput');
-    const text = input.value.trim();
-    if (!text || !activeClientId) return;
-
-    if (window.supabaseClient) {
-        const tenantId = localStorage.getItem('tenant_id') || '00000000-0000-0000-0000-000000000000';
-        await window.supabaseClient.from('chat_messages').insert({
-            client_id: activeClientId,
-            specialist_id: specialistId,
-            tenant_id: tenantId,
-            sender: 'system',
-            text: text,
-            created_at: new Date()
-        });
-        await window.supabaseClient.from('chat_clients').update({ 
-            status: 'em_atendimento',
-            specialist_id: specialistId
-        }).eq('id', activeClientId);
-    } else {
-        let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
-        if (chats[activeClientId]) {
-            chats[activeClientId].messages.push({
-                content: text,
-                type: 'specialist',
-                htmlContent: null
-            });
-            localStorage.setItem('acordo_certo_chats', JSON.stringify(chats));
-        }
-    }
-    
-    input.value = '';
-    renderMessages();
-};
-
-// Enviar com Enter
-document.getElementById('agentInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') document.getElementById('agentSendBtn').click();
-});
 
 // Inicialização
 renderClients();

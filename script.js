@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         name: name || "Cliente",
         cpf_cnpj: cpfCnpj || "",
         status: "aguardando",
-        tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+        tenant_id: tenantId,
       };
 
       if (telefoneCliente) {
@@ -299,7 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         const messagePayload = {
           client_id: clientId,
-          tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+          tenant_id: tenantId,
           text: text,
           sender: isUser ? "client" : "system",
           created_at: new Date().toISOString()
@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { error } = await window.supabaseClient.from("chat_messages").insert([
         {
           client_id: clientId,
-          tenant_id: '0be66bb8-16e6-47e3-9813-73ee9d5ff16d',
+          tenant_id: tenantId,
           text: messageText,
           sender: sender
         },
