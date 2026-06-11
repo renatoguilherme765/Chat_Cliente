@@ -274,20 +274,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // 1. Cadastrar cliente
+      // 1. Cadastrar cliente com UPSERT robusto
       const insertData = {
         id: clientId,
         name: name || "Cliente",
         cpf_cnpj: cpfCnpj || "",
         status: "aguardando",
         tenant_id: tenantId,
+        specialist_id: null,
+        created_at: new Date().toISOString()
       };
 
       if (telefoneCliente) {
         insertData.telefone = telefoneCliente;
       }
 
-      const { error: insertError } = await window.supabaseClient.from("chat_clients").insert([insertData]);
+      const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]);
       if (insertError) throw insertError;
 
       // 2. ENVIO EM SEQUÊNCIA (PROMISE CHAIN)
@@ -313,9 +315,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       clientCreated = true;
-      
-      // 3. MENSAGEM DE TRANSIÇÃO: Única manipulação visual permitida após o clique
-      addMessage("Aguarde um instante, você será conectado a um especialista.", "system", null, false);
       
     } catch (error) {
       console.error("Erro ao persistir histórico:", error);
@@ -914,16 +913,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (action === "falar_especialista") {
       addMessage("4️⃣ Falar com um especialista", "user");
       
-      // A lógica de persistência e a mensagem de "Aguarde" já estão dentro de createClientAndSaveHistory
       isLiveChat = true;
 
       if (window.supabaseClient) {
+        addMessage("Aguarde, um especialista está sendo chamado...", "system", null, false);
+        
         await createClientAndSaveHistory(userName, window.userCpf);
+        
+        // Garante a sinalização no painel
         await window.supabaseClient
           .from("chat_clients")
-          .update({ status: "aguardando" })
+          .update({ status: "aguardando", specialist_id: null })
           .eq("id", clientId);
-        // window.loadExistingMessages(); // Removido para evitar loop/reimpressão
       }
     } else if (action === "gerar_boleto") {
       addMessage("Gerar boleto com desconto", "user");
