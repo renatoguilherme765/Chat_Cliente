@@ -67,7 +67,13 @@ async function selectClient(id, nome, telefone, status = 'aguardando', ownerId =
     
     // Se for live chat, verificar status no banco p/ garantir state mais recente
     if (window.supabaseClient) {
-        const { data: fetchChat } = await window.supabaseClient.from('chat_clients').select('status').eq('id', id).single().catch(() => ({}));
+        let fetchChat = null;
+        try {
+            const res = await window.supabaseClient.from('chat_clients').select('status').eq('id', id).single();
+            fetchChat = res.data;
+        } catch (err) {
+            console.warn("Erro ao buscar chat_clients em selectClient:", err);
+        }
         if (fetchChat) {
             status = fetchChat.status;
         }
@@ -196,7 +202,11 @@ function setupInputListeners() {
 
             console.log("Inserindo anexo em chat_messages:", msgPayload);
             if (data && data.publicUrl) {
-                await window.supabaseClient.from('chat_messages').insert([msgPayload]).catch(() => ({}));
+                try {
+                    await window.supabaseClient.from('chat_messages').insert([msgPayload]);
+                } catch (err) {
+                    console.warn("Erro no trycatch do insert anexo:", err);
+                }
                 renderMessages();
             }
             
@@ -225,7 +235,11 @@ function setupInputListeners() {
                 }
 
                 console.log("Inserindo mensagem em chat_messages (especialista):", msgPayload);
-                await window.supabaseClient.from('chat_messages').insert([msgPayload]).catch(() => ({}));
+                try {
+                    await window.supabaseClient.from('chat_messages').insert([msgPayload]);
+                } catch (err) {
+                    console.warn("Erro no trycatch do insert msgs especialista:", err);
+                }
             } else {
                 let chats = JSON.parse(localStorage.getItem('acordo_certo_chats') || '{}');
                 if (chats[activeClientId]) {

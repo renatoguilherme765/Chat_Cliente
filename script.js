@@ -286,8 +286,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         insertData.telefone = telefoneCliente;
       }
 
-      const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]).catch(() => ({}));
-      if (insertError) console.warn("Aviso ao persistir histórico:", insertError.message);
+      console.log("Iniciando persistência... cadastrando cliente.");
+      try {
+        const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]);
+        if (insertError) {
+            console.error("Erro no upsert de chat_clients:", insertError);
+            throw insertError;
+        }
+        console.log("Cliente upserted com sucesso:", clientId);
+      } catch (err) {
+        console.error("Erro fatal ao persistir histórico (inserção de cliente falhou):", err);
+        return; // Retorna e não insere as mensagens se o cliente falhou
+      }
 
       // 2. ENVIO EM SEQUÊNCIA (PROMISE CHAIN)
       const messageElements = chatArea.querySelectorAll('.message');
@@ -308,7 +318,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         console.log("Inserindo mensagem no histórico:", messagePayload);
-        await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
+        try {
+            const { error: msgError } = await window.supabaseClient.from("chat_messages").insert([messagePayload]);
+            if (msgError) console.warn("Erro recebido no insert:", msgError);
+        } catch (err) {
+            console.warn("Retorno interceptado via try/catch:", err);
+        }
 
         // 2. MARCAÇÃO DE TEMPO: Delay de 100ms
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -345,8 +360,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       console.log("Inserindo mensagem no chat_messages:", messagePayload);
-      const { error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]).catch(() => ({}));
-      if (error) console.warn("Aviso ao salvar mensagem:", error);
+      try {
+          const { error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]);
+          if (error) console.warn("Aviso ao salvar mensagem:", error);
+      } catch (insertCatchErr) {
+          console.warn("Erro capturado no trycatch do insert:", insertCatchErr);
+      }
       
       if (msgDiv && msgDiv._statusSpan) {
         msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
