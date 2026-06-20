@@ -316,7 +316,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const messageElements = chatArea.querySelectorAll('.message');
       
       for (const msgDiv of messageElements) {
-        const text = msgDiv.querySelector('.message-text')?.textContent || "";
+        // innerHTML preserva cards/botões visuais; textContent perderia o layout ao restaurar após F5
+        const text = msgDiv.querySelector('.message-text')?.innerHTML || "";
         const isUser = msgDiv.classList.contains('user-msg');
         
         const messagePayload = {
@@ -744,6 +745,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                         `;
             addMessage(null, type, fileHtml, false, msg.created_at);
           }
+        } else if (/<[a-z][\s\S]*>/i.test(messageText)) {
+          // Mensagem contém HTML preservado (card/botão): restaura via htmlContent
+          addMessage(null, type, messageText, false, msg.created_at);
         } else {
           addMessage(messageText, type, null, false, msg.created_at);
         }
