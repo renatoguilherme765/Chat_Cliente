@@ -37,7 +37,7 @@ function updateClientListUI(liveClients) {
         const telefone = chat.telefone || chat.phone ? (chat.telefone || chat.phone) : 'Sem telefone';
         
         div.innerHTML = `<strong>${nome}</strong><br><small>${telefone}</small>`;
-        div.onclick = () => selectClient(chat.id, nome, telefone, chat.status, chat.specialist_id);
+        div.onclick = () => selectClient(chat.id, nome, telefone, chat.status, chat.especialista_id);
         clientList.appendChild(div);
         
         // Atualiza o cabeçalho se o cliente ativo teve o nome alterado
@@ -88,7 +88,11 @@ async function selectClient(id, nome, telefone, status = 'aguardando', ownerId =
             </button>
         `;
         document.getElementById('btnAtenderChat').onclick = async () => {
-            const updatePayload = { status: 'em_atendimento' };
+            const updatePayload = {
+                status: 'em_atendimento',
+                especialista_id: mySpecialistId,
+                assigned_at: new Date().toISOString()
+            };
 
             const { data, error } = await window.supabaseClient
                 .from('chat_clients')
