@@ -6,7 +6,8 @@
  */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  localStorage.clear();
+  // localStorage.clear() removido: apagava chat_client_id_* a cada F5,
+  // forçando geração de um novo client_id e perda da conversa existente.
   // Função para forçar o download de imagens
   window.downloadImage = async function (url, filename) {
     try {
@@ -838,7 +839,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     sendBtn.disabled = false;
 
     // Tentar carregar histórico se for cliente retornando
-    // REMOVED: isReturningClient check
+    await loadExistingMessages();
 
 
     if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
