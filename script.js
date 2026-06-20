@@ -102,7 +102,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
   
-  let tenantId = localStorage.getItem("tenant_id") || '0be66bb8-16e6-47e3-9813-73ee9d5ff16d';
+  // Sem UUID órfão de fallback: o tenant só é considerado válido se for resolvido
+  // via slug da URL contra a tabela `tenants` (ver bloco abaixo).
+  let tenantId = null;
 
   // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
   const formatCompanyName = (slug) => {
@@ -184,6 +186,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  if (!tenantId) {
+    console.error("Tenant não encontrado. Chat não iniciado.");
+  }
+
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
   const sendBtn = document.getElementById("sendBtn");
@@ -257,6 +263,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   let createClientPromise = null;
 
   async function createClientAndSaveHistory(name, cpfCnpj) {
+    // Bloqueio definitivo: sem tenant resolvido via slug, nenhum chat_client é criado
+    if (!tenantId) {
+      console.error("Tenant não encontrado. Chat não iniciado.");
+      return;
+    }
+
     // 4. Garantir que o client_id seja gerado e validado ANTES de iniciar
     if (!clientId) {
       clientId = crypto.randomUUID();
