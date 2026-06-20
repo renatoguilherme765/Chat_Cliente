@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Lógica de Slug Dinâmico
   const pathParts = window.location.pathname.split('/').filter(Boolean);
   const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
-  
+
   // Sem UUID órfão de fallback: o tenant só é considerado válido se for resolvido
   // via slug da URL contra a tabela `tenants` (ver bloco abaixo).
   let tenantId = null;
@@ -838,9 +838,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     userInput.disabled = false;
     sendBtn.disabled = false;
 
-    // Tentar carregar histórico se for cliente retornando
-    await loadExistingMessages();
-
+    // Tentar carregar histórico se for cliente retornando (preserva client_id, currentStep e isLiveChat)
+    const hasHistory = await loadExistingMessages();
+    if (hasHistory) {
+      // Cliente já cadastrado em chat_clients: habilita persistência de novas mensagens
+      clientCreated = true;
+      if (currentStep === "nome_recebido") {
+        optionsDisplayed = true; // o menu já está no histórico restaurado, evita repetição
+      }
+      return; // Conversa restaurada: não reinicia boas-vindas, CPF ou menu
+    }
 
     if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
       // Fluxo Automático (WhatsApp ou /negociar)
