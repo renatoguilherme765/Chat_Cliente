@@ -194,7 +194,7 @@ function setupInputListeners() {
 
             const msgPayload = {
                 client_id: activeClientId,
-                sender: 'system',
+                sender: 'specialist',
                 text: data.publicUrl,
                 created_at: new Date()
             };
@@ -228,7 +228,7 @@ function setupInputListeners() {
                 
                 const msgPayload = {
                     client_id: activeClientId,
-                    sender: 'system',
+                    sender: 'specialist',
                     text: text,
                     created_at: new Date()
                 };

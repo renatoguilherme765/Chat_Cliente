@@ -263,7 +263,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let isProcessing = false; // Flag de controle para evitar múltiplos cliques
   let createClientPromise = null;
 
-  async function createClientAndSaveHistory(name, cpfCnpj) {
+  async function createClientAndSaveHistory(name, cpfCnpj, status = "aguardando") {
     // Bloqueio definitivo: sem tenant resolvido via slug, nenhum chat_client é criado
     if (!tenantId) {
       console.error("Tenant não encontrado. Chat não iniciado.");
@@ -286,7 +286,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         id: clientId,
         name: name || "Cliente",
         cpf_cnpj: cpfCnpj || "",
-        status: "aguardando",
+        status: status,
         created_at: new Date().toISOString()
       };
 
@@ -354,8 +354,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2 e 4. Salvar mensagens no Supabase (apenas se já criado)
   async function saveMessageToSupabase(text, type, htmlContent, msgDiv = null) {
-    if (!window.supabaseClient || !clientCreated) return;
-    
+    if (!window.supabaseClient) return;
+
+    // Se o cadastro do cliente (createClientAndSaveHistory) ainda estiver em
+    // andamento, espera terminar antes de decidir se salva ou não. Sem isso,
+    // mensagens digitadas rapidamente após o CPF (ex: o nome) nunca eram
+    // persistidas, pois clientCreated ainda estava false nesse instante.
+    if (!clientCreated && createClientPromise) {
+      await createClientPromise;
+    }
+
+    if (!clientCreated) return;
+
     try {
       let sender = type === "user" ? "client" : "system";
       let messageText = text || htmlContent;
@@ -933,16 +943,18 @@ document.addEventListener("DOMContentLoaded", async () => {
           isLiveChat = true;
 
           if (window.supabaseClient) {
-            createClientAndSaveHistory(userName, window.userCpf)
-              .then(() => {
-                return window.supabaseClient
+            // .catch() não existe no builder do supabase-js: precisa de try/await,
+            // senão a chamada lança "catch is not a function" e o update nunca é enviado.
+            (async () => {
+              try {
+                await window.supabaseClient
                   .from("chat_clients")
                   .update({ status: "aguardando" })
                   .eq("id", clientId);
-              })
-              .catch(err => {
+              } catch (err) {
                 console.warn("Falha silenciosa ao atualizar status:", err);
-              });
+              }
+            })();
           }
         }, 1500);
       }, 800);
@@ -967,19 +979,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       isLiveChat = true;
 
       if (window.supabaseClient) {
-        addMessage("Aguarde, um especialista está sendo chamado...", "system", null, false);
-        
-        createClientAndSaveHistory(userName, window.userCpf)
-          .then(() => {
-            // Garante a sinalização no painel
-            return window.supabaseClient
+        // save=true (padrão): sem isso a mensagem nunca seria persistida, pois
+        // createClientAndSaveHistory não é mais chamado neste ponto do fluxo.
+        addMessage("Aguarde, um especialista está sendo chamado...", "system");
+
+        (async () => {
+          try {
+            await window.supabaseClient
               .from("chat_clients")
               .update({ status: "aguardando" })
               .eq("id", clientId);
-          })
-          .catch(err => {
+          } catch (err) {
             console.warn("Falha silenciosa ao chamar especialista:", err);
-          });
+          }
+        })();
       }
     } else if (action === "gerar_boleto") {
       addMessage("Gerar boleto com desconto", "user");
@@ -1009,16 +1022,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           setTimeout(() => {
             isLiveChat = true;
             if (window.supabaseClient) {
-              createClientAndSaveHistory(userName, window.userCpf)
-                .then(() => {
-                  return window.supabaseClient
+              (async () => {
+                try {
+                  await window.supabaseClient
                     .from("chat_clients")
                     .update({ status: "aguardando" })
                     .eq("id", clientId);
-                })
-                .catch(err => {
+                } catch (err) {
                   console.warn("Falha silenciosa ao atualizar status:", err);
-                });
+                }
+              })();
             }
           }, 1000);
         }, 1000);
@@ -1057,6 +1070,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             addMessage("Agora, por favor, digite seu primeiro NOME.", "system");
             currentStep =
               currentStep === "cpf_whatsapp" ? "nome_whatsapp" : "nome";
+            
+            // Registra o cliente imediatamente no Supabase com status 'novo' para evitar perda de dados no F5
+            if (window.supabaseClient) {
+              createClientPromise = createClientAndSaveHistory("Cliente", cleanCPF, "novo");
+            }
           }, 800);
         }, 800);
       } else {
@@ -1077,17 +1095,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (currentStep === "nome" || currentStep === "nome_whatsapp") {
       userName = text.trim();
       if (userName.length >= 2) {
+        const isWhatsapp = currentStep === "nome_whatsapp";
         currentStep = "nome_recebido"; // Atualiza o passo imediatamente
 
-        if (currentStep === "nome_whatsapp") {
+        if (isWhatsapp) {
           setTimeout(async () => {
             const msg = `Obrigado. Você está sendo conectado a um especialista.`;
             addMessage(null, "system", msg);
             isLiveChat = true;
-            // Apenas aqui chamamos o Supabase
-            await createClientAndSaveHistory(userName, window.userCpf);
+            if (window.supabaseClient) {
+              await window.supabaseClient.from("chat_clients")
+                .update({ name: userName, status: "aguardando" })
+                .eq("id", clientId);
+            }
           }, 800);
         } else {
+          if (window.supabaseClient) {
+            window.supabaseClient.from("chat_clients")
+              .update({ name: userName })
+              .eq("id", clientId)
+              .then(() => console.log("Name updated successfully in DB"))
+              .catch(err => console.error("Error updating name:", err));
+          }
           setTimeout(() => {
             addMessage(
               `Obrigado, ${userName}! Consultando condições disponíveis...`,
