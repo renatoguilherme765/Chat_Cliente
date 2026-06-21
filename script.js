@@ -385,14 +385,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       console.log("Inserindo mensagem no chat_messages:", messagePayload);
       try {
-          const { error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]);
-          if (error) console.warn("Aviso ao salvar mensagem:", error);
+          const { data, error } = await window.supabaseClient.from("chat_messages").insert([messagePayload]).select();
+          if (error) {
+            console.warn("Aviso ao salvar mensagem:", error);
+          } else if (data && data.length > 0 && msgDiv) {
+            msgDiv.id = `msg-${data[0].id}`;
+          }
       } catch (insertCatchErr) {
           console.warn("Erro capturado no trycatch do insert:", insertCatchErr);
       }
       
       if (msgDiv && msgDiv._statusSpan) {
-        msgDiv._statusSpan.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+        msgDiv._statusSpan.textContent = "✓";
+        msgDiv._statusSpan.style.color = "#8696a0";
         msgDiv._statusSpan.style.opacity = "1";
       }
     } catch (err) {
@@ -418,10 +423,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function markSpecialistMessagesRead() {
     if (!window.supabaseClient || !clientId) return;
     if (document.visibilityState !== "visible") return; // nunca marca read em background
+    const nowIso = new Date().toISOString();
     try {
       await window.supabaseClient
         .from("chat_messages")
-        .update({ read_at: new Date().toISOString() })
+        .update({ delivered_at: nowIso, read_at: nowIso })
         .eq("client_id", clientId)
         .eq("sender", "specialist")
         .is("read_at", null);
@@ -568,6 +574,30 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_messages",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          if (updated.sender !== "client") return;
+          
+          const msgDiv = document.getElementById(`msg-${updated.id}`);
+          if (msgDiv && msgDiv._statusSpan) {
+            const status = updated.read_at ? "read" : (updated.delivered_at ? "delivered" : "sent");
+            msgDiv._statusSpan.textContent = (status === "delivered" || status === "read") ? "✓✓" : "✓";
+            if (status === "read") {
+              msgDiv._statusSpan.style.color = "#53bdeb";
+            } else {
+              msgDiv._statusSpan.style.color = "#8696a0";
+            }
+          }
+        }
+      )
       .subscribe();
   }
 
@@ -578,8 +608,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     htmlContent = null,
     save = true,
     createdAt = null,
+    status = "sent",
+    messageId = null
   ) {
     const msgDiv = document.createElement("div");
+    if (messageId) {
+      msgDiv.id = `msg-${messageId}`;
+    }
     if (!htmlContent || !htmlContent.includes("pdf-clean")) {
       msgDiv.classList.add("message");
       msgDiv.classList.add(type === "system" ? "system-msg" : "user-msg");
@@ -689,9 +724,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>';
         statusSpan.style.opacity = "0.5";
       } else {
-        // Ícone de check (já enviado/histórico)
-        statusSpan.innerHTML =
-          '<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>';
+        // WhatsApp ticks behavior
+        statusSpan.textContent = (status === "delivered" || status === "read") ? "✓✓" : "✓";
+        if (status === "read") {
+          statusSpan.style.color = "#53bdeb"; // blue
+        } else {
+          statusSpan.style.color = "#8696a0"; // grey
+        }
         statusSpan.style.opacity = "1";
       }
       timeDiv.appendChild(statusSpan);
@@ -766,7 +805,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 </a>
                             </div>
                         `;
-            addMessage(null, type, imgHtml, false, msg.created_at);
+            const msgStatus = msg.read_at ? "read" : (msg.delivered_at ? "delivered" : "sent");
+            addMessage(null, type, imgHtml, false, msg.created_at, msgStatus, msg.id);
           } else {
             const fileHtml = `
                           <div 
@@ -809,13 +849,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                             </div>
                           </div>
                         `;
-            addMessage(null, type, fileHtml, false, msg.created_at);
+            const msgStatus = msg.read_at ? "read" : (msg.delivered_at ? "delivered" : "sent");
+            addMessage(null, type, fileHtml, false, msg.created_at, msgStatus, msg.id);
           }
         } else if (/<[a-z][\s\S]*>/i.test(messageText)) {
           // Mensagem contém HTML preservado (card/botão): restaura via htmlContent
-          addMessage(null, type, messageText, false, msg.created_at);
+          const msgStatus = msg.read_at ? "read" : (msg.delivered_at ? "delivered" : "sent");
+          addMessage(null, type, messageText, false, msg.created_at, msgStatus, msg.id);
         } else {
-          addMessage(messageText, type, null, false, msg.created_at);
+          const msgStatus = msg.read_at ? "read" : (msg.delivered_at ? "delivered" : "sent");
+          addMessage(messageText, type, null, false, msg.created_at, msgStatus, msg.id);
         }
       });
 
