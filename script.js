@@ -400,6 +400,56 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Confirmação de entrega/leitura das mensagens do especialista (para o painel)
+  async function markSpecialistMessagesDelivered() {
+    if (!window.supabaseClient || !clientId) return;
+    try {
+      await window.supabaseClient
+        .from("chat_messages")
+        .update({ delivered_at: new Date().toISOString() })
+        .eq("client_id", clientId)
+        .eq("sender", "specialist")
+        .is("delivered_at", null);
+    } catch (err) {
+      console.warn("Erro silencioso ao marcar mensagens como delivered:", err);
+    }
+  }
+
+  async function markSpecialistMessagesRead() {
+    if (!window.supabaseClient || !clientId) return;
+    if (document.visibilityState !== "visible") return; // nunca marca read em background
+    try {
+      await window.supabaseClient
+        .from("chat_messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("client_id", clientId)
+        .eq("sender", "specialist")
+        .is("read_at", null);
+    } catch (err) {
+      console.warn("Erro silencioso ao marcar mensagens como read:", err);
+    }
+  }
+
+  async function markSpecialistMessageDeliveredById(messageId) {
+    if (!window.supabaseClient || !messageId) return;
+    try {
+      await window.supabaseClient
+        .from("chat_messages")
+        .update({ delivered_at: new Date().toISOString() })
+        .eq("id", messageId)
+        .is("delivered_at", null);
+    } catch (err) {
+      console.warn("Erro silencioso ao marcar mensagem como delivered:", err);
+    }
+  }
+
+  // Reavalia "read" sempre que a aba volta a ficar visível (nunca em background)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      markSpecialistMessagesRead();
+    }
+  });
+
   // 5. Escutar mensagens em tempo real
   if (window.supabaseClient) {
     window.supabaseClient
@@ -414,6 +464,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         (payload) => {
           if (payload.new.sender !== "specialist") return;
+
+          // Confirmação de entrega (e leitura, se a aba estiver visível) da mensagem que chegou agora
+          markSpecialistMessageDeliveredById(payload.new.id);
+          if (document.visibilityState === "visible") {
+            markSpecialistMessagesRead();
+          }
 
           const messageText = payload.new.text || payload.new.content || "";
 
@@ -762,6 +818,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           addMessage(messageText, type, null, false, msg.created_at);
         }
       });
+
+      // Mensagens do especialista acabaram de ser renderizadas na tela: confirma entrega
+      // (e leitura, se a aba estiver visível em primeiro plano agora).
+      markSpecialistMessagesDelivered();
+      markSpecialistMessagesRead();
 
       // Verifica o status do cliente para saber se já está em atendimento
       const { data: clientData } = await window.supabaseClient
