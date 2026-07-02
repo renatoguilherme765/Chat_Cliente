@@ -99,9 +99,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // Lógica de Slug Dinâmico
-  const pathParts = window.location.pathname.split('/').filter(Boolean);
-  const slug_da_url = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
+  // ── URL Parser ───────────────────────────────────────────────────────────────
+  // Rota canônica: /{tenantSlug}  ou  /{tenantSlug}/{carteiraSlug}
+  // Exemplos: /ml-gomes  |  /ml-gomes/veiculos  |  /ml-gomes/credito-imobiliario
+  const ROUTE_SEGMENTS = { TENANT: 0, CARTEIRA: 1 };
+
+  const parseChatRoute = (pathname) => {
+    const parts = pathname.split('/').filter(Boolean);
+    return {
+      tenantSlug:   parts[ROUTE_SEGMENTS.TENANT]   ?? null,
+      carteiraSlug: parts[ROUTE_SEGMENTS.CARTEIRA] ?? null,
+    };
+  };
+
+  const { tenantSlug, carteiraSlug } = parseChatRoute(window.location.pathname);
+  const isNegociarRoute = tenantSlug === 'negociar';
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Sem UUID órfão de fallback: o tenant só é considerado válido se for resolvido
   // via slug da URL contra a tabela `tenants` (ver bloco abaixo).
@@ -119,15 +132,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
   const headerTitle = document.querySelector(".header-title h1");
   if (headerTitle) {
-    headerTitle.textContent = formatCompanyName(slug_da_url);
+    headerTitle.textContent = formatCompanyName(tenantSlug);
   }
 
-  console.log("Slug capturado da URL:", slug_da_url);
-
   // VALIDAÇÃO E BUSCA DE DADOS DA EMPRESA (TENANT)
-  if (slug_da_url && slug_da_url.toLowerCase() !== 'index.html') {
-    const searchSlug = slug_da_url.toLowerCase();
-    console.log("Buscando no banco o slug:", searchSlug);
+  if (tenantSlug && tenantSlug.toLowerCase() !== 'index.html') {
+    const searchSlug = tenantSlug.toLowerCase();
 
     if (window.supabaseClient) {
       const { data: tenantData, error: tenantError } =
@@ -190,6 +200,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!tenantId) {
     console.error("Tenant não encontrado. Chat não iniciado.");
   }
+
+  let carteiraId = null;
 
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
@@ -884,8 +896,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         currentStep = "done";
       } else {
         // Restaurar o currentStep baseado no histórico
-        const isNegociarRoute =
-          window.location.pathname.replace(/\/$/, "") === "/negociar";
         const isWhatsappOrigin = origem === "whatsapp";
 
         const reversedMessages = [...messages].reverse();
@@ -941,9 +951,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Fluxo Inicial
   async function initChat() {
-    const isNegociarRoute =
-      window.location.pathname.replace(/\/$/, "") === "/negociar";
     const isWhatsappOrigin = origem === "whatsapp";
+
+    // Lookup da carteira pelo slug (quando fornecido na URL)
+    if (carteiraSlug && tenantId && window.supabaseClient) {
+      const { data: carteiraData, error: carteiraError } = await window.supabaseClient
+        .from('carteiras')
+        .select('id, nome')
+        .eq('tenant_id', tenantId)
+        .ilike('slug', carteiraSlug.toLowerCase())
+        .single();
+
+      if (!carteiraError && carteiraData) {
+        carteiraId = carteiraData.id;
+      } else {
+        console.warn('Carteira não encontrada:', carteiraSlug, carteiraError?.message);
+      }
+    }
 
     // Garantir que o campo de digitação esteja visível e ativo
     const footer = document.querySelector(".footer");
@@ -965,6 +989,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         optionsDisplayed = true; // o menu já está no histórico restaurado, evita repetição
       }
       return; // Conversa restaurada: não reinicia boas-vindas, CPF ou menu
+    }
+
+    // Carteira solicitada na URL mas não encontrada no banco
+    if (carteiraSlug && !carteiraId) {
+      addMessage(
+        `O link de atendimento solicitado não foi encontrado. Por favor, verifique o endereço ou entre em contato conosco.`,
+        "system",
+        null,
+        false
+      );
     }
 
     if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
