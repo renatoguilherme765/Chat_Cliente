@@ -222,13 +222,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
+  // Chave de isolamento por empresa + carteira (carteiraSlug disponível antes de initChat)
+  const clientStorageKey = carteiraSlug
+    ? `chat_client_id_${tenantId}_${carteiraSlug}`
+    : `chat_client_id_${tenantId}`;
+
   // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
-  let clientId = localStorage.getItem(`chat_client_id_${tenantId}`);
+  let clientId = localStorage.getItem(clientStorageKey);
   let isReturningClient = !!clientId;
-  
+
   if (!clientId) {
     clientId = crypto.randomUUID();
-    localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+    localStorage.setItem(clientStorageKey, clientId);
   }
 
   // 2. Garantir que a área de chat comece vazia
@@ -288,7 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 4. Garantir que o client_id seja gerado e validado ANTES de iniciar
     if (!clientId) {
       clientId = crypto.randomUUID();
-      localStorage.setItem(`chat_client_id_${tenantId}`, clientId);
+      localStorage.setItem(clientStorageKey, clientId);
     }
 
     if (!window.supabaseClient || clientCreated || isProcessing) return;
