@@ -144,7 +144,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { data: tenantData, error: tenantError } =
         await window.supabaseClient
           .from("tenants")
-          .select("id, slug, nome, logo_url")
+          .select("id, slug, nome_empresa, logo_url")
           .ilike("slug", searchSlug)
           .single();
 
@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         tenantId = tenantData.id;
         localStorage.setItem("tenant_id", tenantId);
-        tenantNome = tenantData.nome || formatCompanyName(tenantSlug);
+        tenantNome = tenantData.nome_empresa || formatCompanyName(tenantSlug);
         if (headerTitle) headerTitle.textContent = tenantNome;
 
         // Renderização Condicional da Logo (Vanilla JS substituindo JSX)
@@ -995,15 +995,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       return; // Conversa restaurada: não reinicia boas-vindas, CPF ou menu
     }
 
-    // Erro fatal apenas quando a empresa (tenant) não existe — carteira inexistente não interrompe o chat
-    if (carteiraSlug && !carteiraId && !tenantId) {
-      addMessage(
-        `O link de atendimento solicitado não foi encontrado. Por favor, verifique o endereço ou entre em contato conosco.`,
-        "system",
-        null,
-        false
-      );
-    }
 
     if (telefoneCliente || isNegociarRoute || isWhatsappOrigin) {
       // Fluxo Automático (WhatsApp ou /negociar)
