@@ -774,12 +774,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function loadExistingMessages() {
     if (!window.supabaseClient) return false;
 
-    const { data: messages, error } = await window.supabaseClient
+    let _msgQ = window.supabaseClient
       .from("chat_messages")
       .select("*")
       .eq("client_id", clientId)
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: true });
+      .eq("tenant_id", tenantId);
+    if (carteiraId) _msgQ = _msgQ.eq("carteira_id", carteiraId);
+    const { data: messages, error } = await _msgQ.order("created_at", { ascending: true });
 
     if (messages && messages.length > 0) {
       messages.forEach((msg) => {
@@ -887,12 +888,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       markSpecialistMessagesRead();
 
       // Verifica o status do cliente para saber se já está em atendimento
-      const { data: clientData } = await window.supabaseClient
+      let _clientQ = window.supabaseClient
         .from("chat_clients")
         .select("status")
         .eq("id", clientId)
-        .eq("tenant_id", tenantId)
-        .single();
+        .eq("tenant_id", tenantId);
+      if (carteiraId) _clientQ = _clientQ.eq("carteira_id", carteiraId);
+      const { data: clientData } = await _clientQ.single();
 
       if (
         clientData &&
