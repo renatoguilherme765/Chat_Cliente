@@ -995,8 +995,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       return; // Conversa restaurada: não reinicia boas-vindas, CPF ou menu
     }
 
-    // Carteira solicitada na URL mas não encontrada no banco
-    if (carteiraSlug && !carteiraId) {
+    // Erro fatal apenas quando a empresa (tenant) não existe — carteira inexistente não interrompe o chat
+    if (carteiraSlug && !carteiraId && !tenantId) {
       addMessage(
         `O link de atendimento solicitado não foi encontrado. Por favor, verifique o endereço ou entre em contato conosco.`,
         "system",
