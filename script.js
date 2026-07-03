@@ -131,8 +131,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
   const headerTitle = document.querySelector(".header-title h1");
+  let tenantNome = formatCompanyName(tenantSlug);
   if (headerTitle) {
-    headerTitle.textContent = formatCompanyName(tenantSlug);
+    headerTitle.textContent = tenantNome;
   }
 
   // VALIDAÇÃO E BUSCA DE DADOS DA EMPRESA (TENANT)
@@ -143,7 +144,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { data: tenantData, error: tenantError } =
         await window.supabaseClient
           .from("tenants")
-          .select("id, slug, logo_url") // <-- Adicionado logo_url
+          .select("id, slug, nome, logo_url")
           .ilike("slug", searchSlug)
           .single();
 
@@ -153,6 +154,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         tenantId = tenantData.id;
         localStorage.setItem("tenant_id", tenantId);
+        tenantNome = tenantData.nome || formatCompanyName(tenantSlug);
+        if (headerTitle) headerTitle.textContent = tenantNome;
 
         // Renderização Condicional da Logo (Vanilla JS substituindo JSX)
         if (tenantData.logo_url) {
@@ -964,6 +967,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!carteiraError && carteiraData) {
         carteiraId = carteiraData.id;
+        if (headerTitle) headerTitle.textContent = `${tenantNome} - ${carteiraData.nome}`;
       } else {
         console.warn('Carteira não encontrada:', carteiraSlug, carteiraError?.message);
       }
