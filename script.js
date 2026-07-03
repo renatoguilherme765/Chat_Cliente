@@ -314,6 +314,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         insertData.telefone = telefoneCliente;
       }
 
+      if (carteiraId && isValidUUID(carteiraId)) {
+        insertData.carteira_id = carteiraId;
+      }
+
       console.log("Iniciando persistência... cadastrando cliente.");
       try {
         const { error: insertError } = await window.supabaseClient.from("chat_clients").upsert([insertData]);
