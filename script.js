@@ -222,18 +222,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     urlParams.get("tel") || urlParams.get("telefone") || "";
   const origem = urlParams.get("origem");
 
-  // Chave de isolamento por empresa + carteira (carteiraSlug disponível antes de initChat)
-  const clientStorageKey = carteiraSlug
-    ? `chat_client_id_${tenantId}_${carteiraSlug}`
-    : `chat_client_id_${tenantId}`;
+  // Uma conversa (atendimento) = um chat_clients.id novo. A identidade vive em
+  // sessionStorage: sobrevive ao F5 na MESMA aba (não duplica a conversa em
+  // andamento), mas NÃO é reutilizada entre visitas/pessoas diferentes. Não é
+  // chaveada por tenant/carteira/telefone — cada nova conversa gera um novo UUID.
+  const clientStorageKey = 'chat_client_id';
 
-  // 1. Recuperar ou gerar client_id (PERSISTÊNCIA PARA SOBREVIVER AO F5)
-  let clientId = localStorage.getItem(clientStorageKey);
+  // 1. Recuperar ou gerar client_id (persiste só na sessão da aba, p/ sobreviver ao F5)
+  let clientId = sessionStorage.getItem(clientStorageKey);
   let isReturningClient = !!clientId;
 
   if (!clientId) {
     clientId = crypto.randomUUID();
-    localStorage.setItem(clientStorageKey, clientId);
+    sessionStorage.setItem(clientStorageKey, clientId);
   }
 
   // 2. Garantir que a área de chat comece vazia
@@ -293,7 +294,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 4. Garantir que o client_id seja gerado e validado ANTES de iniciar
     if (!clientId) {
       clientId = crypto.randomUUID();
-      localStorage.setItem(clientStorageKey, clientId);
+      sessionStorage.setItem(clientStorageKey, clientId);
     }
 
     if (!window.supabaseClient || clientCreated || isProcessing) return;
@@ -619,6 +620,28 @@ document.addEventListener("DOMContentLoaded", async () => {
             } else {
               msgDiv._statusSpan.style.color = "#8696a0";
             }
+          }
+        }
+      )
+      .subscribe();
+
+    // Detecta a finalizacao DESTE atendimento (status -> 'finalizado', feita pelo
+    // especialista/gestor) e descarta o clientId da sessão. Assim o próximo
+    // atendimento nesta aba (novo carregamento) gera um NOVO chat_clients.id —
+    // nunca reutiliza um atendimento encerrado nem mistura mensagens.
+    window.supabaseClient
+      .channel(`chat_client_status_${clientId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_clients",
+          filter: `id=eq.${clientId}`,
+        },
+        (payload) => {
+          if (payload.new && payload.new.status === "finalizado") {
+            sessionStorage.removeItem(clientStorageKey);
           }
         }
       )
@@ -1093,7 +1116,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               try {
                 await window.supabaseClient
                   .from("chat_clients")
-                  .update({ status: "aguardando" })
+                  .update({ status: "aguardando", especialista_id: null, assigned_at: null })
                   .eq("id", clientId);
               } catch (err) {
                 console.warn("Falha silenciosa ao atualizar status:", err);
@@ -1131,7 +1154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           try {
             await window.supabaseClient
               .from("chat_clients")
-              .update({ status: "aguardando" })
+              .update({ status: "aguardando", especialista_id: null, assigned_at: null })
               .eq("id", clientId);
           } catch (err) {
             console.warn("Falha silenciosa ao chamar especialista:", err);
@@ -1170,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 try {
                   await window.supabaseClient
                     .from("chat_clients")
-                    .update({ status: "aguardando" })
+                    .update({ status: "aguardando", especialista_id: null, assigned_at: null })
                     .eq("id", clientId);
                 } catch (err) {
                   console.warn("Falha silenciosa ao atualizar status:", err);
@@ -1249,7 +1272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             isLiveChat = true;
             if (window.supabaseClient) {
               await window.supabaseClient.from("chat_clients")
-                .update({ name: userName, status: "aguardando" })
+                .update({ name: userName, status: "aguardando", especialista_id: null, assigned_at: null })
                 .eq("id", clientId);
             }
           }, 800);

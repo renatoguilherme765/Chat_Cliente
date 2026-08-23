@@ -56,6 +56,21 @@ body {
     overflow-y: auto;
 }
 
+.sidebar-version {
+    padding: 10px 20px;
+    border-top: 1px solid #d1d7db;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.sidebar-version span {
+    font-size: 10px;
+    font-weight: 600;
+    color: #b0b4b8;
+    letter-spacing: 0.05em;
+}
+
 .empty-state {
     padding: 20px;
     text-align: center;
