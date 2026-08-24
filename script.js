@@ -116,11 +116,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const isNegociarRoute = tenantSlug === 'negociar';
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // Sem UUID órfão de fallback: o tenant só é considerado válido se for resolvido
-  // via slug da URL contra a tabela `tenants` (ver bloco abaixo).
+  // ── Identificadores e resolução de contexto ──────────────────────────────────
   let tenantId = null;
+  let carteiraId = null;
+  let tenantData = null;
+  let carteiraData = null;
 
-  // Função para formatar o nome da empresa (Title Case e tratamento de hífens/sublinhados)
+  // Função auxiliar para formatar o nome a partir do slug (Title Case)
   const formatCompanyName = (slug) => {
     if (!slug || slug.toLowerCase() === 'index.html') return "Atendimento Digital";
     return slug
@@ -129,73 +131,56 @@ document.addEventListener("DOMContentLoaded", async () => {
       .join(" ");
   };
 
-  // Atualizar o nome da empresa no cabeçalho IMEDIATAMENTE via URL
-  const headerTitle = document.querySelector(".header-title h1");
-  let tenantNome = formatCompanyName(tenantSlug);
-  if (headerTitle) {
-    headerTitle.textContent = tenantNome;
-  }
-
-  // VALIDAÇÃO E BUSCA DE DADOS DA EMPRESA (TENANT)
+  // 1. RESOLUÇÃO DE TENANT E CARTEIRA (Sem mutações prematuras no DOM)
   if (tenantSlug && tenantSlug.toLowerCase() !== 'index.html') {
     const searchSlug = tenantSlug.toLowerCase();
 
     if (window.supabaseClient) {
-      const { data: tenantData, error: tenantError } =
+      const { data: tData, error: tError } =
         await window.supabaseClient
           .from("tenants")
           .select("id, slug, nome_empresa, logo_url")
           .ilike("slug", searchSlug)
           .single();
 
-      if (tenantError || !tenantData) {
-        console.error("Erro ao buscar tenant:", tenantError?.message);
-        // alert("Erro: Empresa não identificada"); // Mantido comentado para não travar testes
+      if (tError || !tData) {
+        console.error("Erro ao buscar tenant:", tError?.message);
       } else {
-        tenantId = tenantData.id;
+        tenantData = tData;
+        tenantId = tData.id;
         localStorage.setItem("tenant_id", tenantId);
-        tenantNome = tenantData.nome_empresa || formatCompanyName(tenantSlug);
-        if (headerTitle) headerTitle.textContent = tenantNome;
 
-        // Renderização Condicional da Logo (Vanilla JS substituindo JSX)
-        if (tenantData.logo_url) {
-          const profilePic = document.querySelector(".profile-pic");
-          if (profilePic) {
-            profilePic.src = tenantData.logo_url;
-            // Aplicando as classes exatas solicitadas (w-10 h-10 rounded-full object-cover border border-white/20 bg-white)
-            profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
-            profilePic.style.backgroundColor = "white";
-            profilePic.style.objectFit = "cover";
-            profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
-            profilePic.style.borderRadius = "9999px";
-            profilePic.style.width = "40px";
-            profilePic.style.height = "40px";
+        // Se houver slug de carteira na URL, resolve a carteira antecipadamente
+        if (carteiraSlug) {
+          const { data: cData, error: cError } = await window.supabaseClient
+            .from("carteiras")
+            .select("id, slug, nome")
+            .eq("tenant_id", tenantId)
+            .ilike("slug", carteiraSlug.toLowerCase())
+            .single();
+
+          if (!cError && cData) {
+            carteiraData = cData;
+            carteiraId = cData.id;
+          } else {
+            console.warn("Carteira não encontrada:", carteiraSlug, cError?.message);
           }
         }
       }
     }
   } else {
-    // Fallback caso não tenha slug na URL, busca a logo pelo tenantId salvo
-    if (window.supabaseClient && tenantId && tenantId !== "00000000-0000-0000-0000-000000000000") {
-      const { data } = await window.supabaseClient
+    // Fallback caso não tenha slug na URL, busca dados pelo tenantId salvo em localStorage
+    const savedTenantId = localStorage.getItem("tenant_id");
+    if (window.supabaseClient && savedTenantId && savedTenantId !== "00000000-0000-0000-0000-000000000000") {
+      const { data: tData } = await window.supabaseClient
         .from("tenants")
-        .select("logo_url")
-        .eq("id", tenantId)
+        .select("id, slug, nome_empresa, logo_url")
+        .eq("id", savedTenantId)
         .single();
-        
-      if (data && data.logo_url) {
-        const profilePic = document.querySelector(".profile-pic");
-        if (profilePic) {
-          profilePic.src = data.logo_url;
-          // Aplicando as classes exatas solicitadas
-          profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
-          profilePic.style.backgroundColor = "white";
-          profilePic.style.objectFit = "cover";
-          profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
-          profilePic.style.borderRadius = "9999px";
-          profilePic.style.width = "40px";
-          profilePic.style.height = "40px";
-        }
+
+      if (tData) {
+        tenantData = tData;
+        tenantId = tData.id;
       }
     }
   }
@@ -204,7 +189,130 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Tenant não encontrado. Chat não iniciado.");
   }
 
-  let carteiraId = null;
+  const resolved = {
+    tenant_id: tenantId,
+    nome_empresa: tenantData?.nome_empresa || null,
+    logo_url: tenantData?.logo_url || null,
+    carteira_id: carteiraId,
+    carteira_nome: carteiraData?.nome || null,
+    fallbackNome: formatCompanyName(tenantSlug),
+  };
+
+  // 2. BUSCA DO FLUXO PUBLICADO (bot_flows)
+  async function getBotConfig({ tenantId, carteiraId = null, carteiraSlug = null } = {}) {
+    const cliente = typeof window !== "undefined" ? window.supabaseClient : null;
+    if (!cliente || !tenantId) return null;
+
+    try {
+      if (carteiraSlug && !carteiraId) {
+        console.warn(
+          `[Bot] Carteira "${carteiraSlug}" não identificada na empresa. Usando fallback de identidade.`,
+        );
+        return null;
+      }
+
+      let consulta = cliente
+        .from("bot_flows")
+        .select("flow, is_default, published_version, updated_at")
+        .eq("tenant_id", tenantId)
+        .not("published_version", "is", null);
+
+      consulta =
+        carteiraId === null
+          ? consulta.is("carteira_id", null)
+          : consulta.eq("carteira_id", carteiraId);
+
+      const { data, error } = await consulta
+        .order("is_default", { ascending: false })
+        .order("updated_at", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.warn("[Bot] Não foi possível ler o fluxo publicado:", error.message);
+        return null;
+      }
+
+      if (!data || !data.length || !data[0].flow) {
+        console.warn("[Bot] Nenhum fluxo publicado encontrado para este contexto.");
+        return null;
+      }
+
+      const flowObj = data[0].flow;
+      const pubVer = data[0].published_version || flowObj.publishedVersion;
+      const versionObj = Array.isArray(flowObj.versions)
+        ? flowObj.versions.find((v) => v.version === pubVer)
+        : null;
+
+      const config = versionObj?.document || versionObj?.config || flowObj.document || flowObj.config || null;
+      const identity = config?.identity || versionObj?.identity || flowObj.identity || {};
+
+      return {
+        version: pubVer,
+        identity: {
+          chatName: identity.chatName || null,
+          profilePicUrl: identity.profilePicUrl || null,
+        },
+        theme: config?.theme || {},
+        initialStep: config?.initialStep || "start",
+        config,
+      };
+    } catch (err) {
+      console.warn("[Bot] Falha ao consultar o fluxo publicado:", err);
+      return null;
+    }
+  }
+
+  // 3. RENDERIZAÇÃO ATÔMICA DA IDENTIDADE VISUAL (Executada UMA ÚNICA VEZ)
+  function renderChatIdentity(botConfig, resolvedContext = {}) {
+    const headerTitle = document.querySelector(".header-title h1");
+    const profilePic = document.querySelector(".profile-pic");
+
+    // Resolução estrita do nome de exibição:
+    // Prioridade 1: chatName configurado no Builder / publicado
+    // Prioridade 2: "Nome Empresa - Nome Carteira"
+    // Prioridade 3: "Nome Empresa"
+    // Prioridade 4: Fallback do slug
+    // Prioridade 5: "Atendimento Digital"
+    let finalName;
+    if (
+      botConfig?.identity?.chatName &&
+      typeof botConfig.identity.chatName === "string" &&
+      botConfig.identity.chatName.trim() !== ""
+    ) {
+      finalName = botConfig.identity.chatName.trim();
+    } else if (resolvedContext.nome_empresa && resolvedContext.carteira_nome) {
+      finalName = `${resolvedContext.nome_empresa} - ${resolvedContext.carteira_nome}`;
+    } else if (resolvedContext.nome_empresa) {
+      finalName = resolvedContext.nome_empresa;
+    } else if (resolvedContext.fallbackNome) {
+      finalName = resolvedContext.fallbackNome;
+    } else {
+      finalName = "Atendimento Digital";
+    }
+
+    if (headerTitle) {
+      headerTitle.textContent = finalName;
+    }
+
+    // Resolução da imagem / logo:
+    // Prioridade 1: profilePicUrl do Builder
+    // Prioridade 2: logo_url da tabela tenants
+    const finalLogo = botConfig?.identity?.profilePicUrl || resolvedContext.logo_url || null;
+    if (finalLogo && profilePic) {
+      profilePic.src = finalLogo;
+      profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
+      profilePic.style.backgroundColor = "white";
+      profilePic.style.objectFit = "cover";
+      profilePic.style.border = "1px solid rgba(255,255,255,0.2)";
+      profilePic.style.borderRadius = "9999px";
+      profilePic.style.width = "40px";
+      profilePic.style.height = "40px";
+    }
+  }
+
+  // Obter configuração do bot e renderizar identidade UMA ÚNICA VEZ
+  const botConfig = await getBotConfig({ tenantId, carteiraId, carteiraSlug });
+  renderChatIdentity(botConfig, resolved);
 
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
@@ -990,20 +1098,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function initChat() {
     const isWhatsappOrigin = origem === "whatsapp";
 
-    // Lookup da carteira pelo slug (quando fornecido na URL)
-    if (carteiraSlug && tenantId && window.supabaseClient) {
-      const { data: carteiraData, error: carteiraError } = await window.supabaseClient
+    // Se carteiraId não foi resolvido anteriormente, tenta lookup resiliente
+    if (carteiraSlug && tenantId && !carteiraId && window.supabaseClient) {
+      const { data: cData, error: cError } = await window.supabaseClient
         .from('carteiras')
         .select('id, nome')
         .eq('tenant_id', tenantId)
         .ilike('slug', carteiraSlug.toLowerCase())
         .single();
 
-      if (!carteiraError && carteiraData) {
-        carteiraId = carteiraData.id;
-        if (headerTitle) headerTitle.textContent = `${tenantNome} - ${carteiraData.nome}`;
-      } else {
-        console.warn('Carteira não encontrada:', carteiraSlug, carteiraError?.message);
+      if (!cError && cData) {
+        carteiraId = cData.id;
       }
     }
 
