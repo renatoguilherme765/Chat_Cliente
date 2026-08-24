@@ -119,84 +119,72 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ── Identificadores e resolução de contexto ──────────────────────────────────
   let tenantId = null;
   let carteiraId = null;
-  let tenantData = null;
-  let carteiraData = null;
+  let carteiraNome = null;
+  let tenantNome = null;
+  let logoUrl = null;
 
-  // Função auxiliar para formatar o nome a partir do slug (Title Case)
-  const formatCompanyName = (slug) => {
-    if (!slug || slug.toLowerCase() === 'index.html') return "Atendimento Digital";
-    return slug
-      .split(/[-_]/)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ");
-  };
+  // 1. RESOLUÇÃO SEGURA DO CONTEXTO PÚBLICO VIA EDGE FUNCTION
+  if (tenantSlug && tenantSlug.toLowerCase() !== "index.html") {
+    try {
+      let resolved = null;
+      let resolveErr = null;
 
-  // 1. RESOLUÇÃO DE TENANT E CARTEIRA (Sem mutações prematuras no DOM)
-  if (tenantSlug && tenantSlug.toLowerCase() !== 'index.html') {
-    const searchSlug = tenantSlug.toLowerCase();
-
-    if (window.supabaseClient) {
-      const { data: tData, error: tError } =
-        await window.supabaseClient
-          .from("tenants")
-          .select("id, slug, nome_empresa, logo_url")
-          .ilike("slug", searchSlug)
-          .single();
-
-      if (tError || !tData) {
-        console.error("Erro ao buscar tenant:", tError?.message);
-      } else {
-        tenantData = tData;
-        tenantId = tData.id;
-        localStorage.setItem("tenant_id", tenantId);
-
-        // Se houver slug de carteira na URL, resolve a carteira antecipadamente
-        if (carteiraSlug) {
-          const { data: cData, error: cError } = await window.supabaseClient
-            .from("carteiras")
-            .select("id, slug, nome")
-            .eq("tenant_id", tenantId)
-            .ilike("slug", carteiraSlug.toLowerCase())
-            .single();
-
-          if (!cError && cData) {
-            carteiraData = cData;
-            carteiraId = cData.id;
-          } else {
-            console.warn("Carteira não encontrada:", carteiraSlug, cError?.message);
+      // 1.1 Invocação da Edge Function 'resolve-public-chat'
+      if (window.supabaseClient) {
+        const res = await window.supabaseClient.functions.invoke(
+          "resolve-public-chat",
+          {
+            body: {
+              tenant_slug: tenantSlug,
+              carteira_slug: carteiraSlug || undefined,
+            },
           }
+        );
+        resolved = res.data;
+        resolveErr = res.error;
+      }
+
+      // 1.2 Fallback resiliente para /api/resolve-public-chat caso disponível
+      if ((!resolved || resolveErr) && typeof fetch !== "undefined") {
+        try {
+          const apiRes = await fetch("/api/resolve-public-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tenant_slug: tenantSlug,
+              carteira_slug: carteiraSlug || undefined,
+            }),
+          });
+          if (apiRes.ok) {
+            resolved = await apiRes.json();
+            resolveErr = null;
+          }
+        } catch {
+          // Ignora fallback se indisponível
         }
       }
-    }
-  } else {
-    // Fallback caso não tenha slug na URL, busca dados pelo tenantId salvo em localStorage
-    const savedTenantId = localStorage.getItem("tenant_id");
-    if (window.supabaseClient && savedTenantId && savedTenantId !== "00000000-0000-0000-0000-000000000000") {
-      const { data: tData } = await window.supabaseClient
-        .from("tenants")
-        .select("id, slug, nome_empresa, logo_url")
-        .eq("id", savedTenantId)
-        .single();
 
-      if (tData) {
-        tenantData = tData;
-        tenantId = tData.id;
+      if (resolveErr || !resolved) {
+        console.error("Erro ao resolver contexto do chat público:", resolveErr?.message || resolveErr);
+      } else {
+        tenantId = resolved.tenant_id || null;
+        carteiraId = resolved.carteira_id || null;
+        carteiraNome = resolved.nome || resolved.carteira_nome || null;
+        tenantNome = resolved.nome_empresa || null;
+        logoUrl = resolved.logo_url || null;
+
+        if (tenantId) {
+          localStorage.setItem("tenant_id", tenantId);
+        }
       }
+    } catch (err) {
+      console.error("Exceção ao chamar resolve-public-chat:", err);
     }
   }
 
   if (!tenantId) {
     console.error("Tenant não encontrado. Chat não iniciado.");
   }
-
-  const resolved = {
-    tenant_id: tenantId,
-    nome_empresa: tenantData?.nome_empresa || null,
-    logo_url: tenantData?.logo_url || null,
-    carteira_id: carteiraId,
-    carteira_nome: carteiraData?.nome || null,
-    fallbackNome: formatCompanyName(tenantSlug),
-  };
 
   // 2. BUSCA DO FLUXO PUBLICADO (bot_flows)
   async function getBotConfig({ tenantId, carteiraId = null, carteiraSlug = null } = {}) {
@@ -206,7 +194,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       if (carteiraSlug && !carteiraId) {
         console.warn(
-          `[Bot] Carteira "${carteiraSlug}" não identificada na empresa. Usando fallback de identidade.`,
+          `[Bot] Carteira "${carteiraSlug}" não identificada na empresa.`,
         );
         return null;
       }
@@ -263,41 +251,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // 3. RENDERIZAÇÃO ATÔMICA DA IDENTIDADE VISUAL (Executada UMA ÚNICA VEZ)
-  function renderChatIdentity(botConfig, resolvedContext = {}) {
+  function renderChatIdentity(botConfig, companyLogoUrl = null) {
     const headerTitle = document.querySelector(".header-title h1");
     const profilePic = document.querySelector(".profile-pic");
 
-    // Resolução estrita do nome de exibição:
-    // Prioridade 1: chatName configurado no Builder / publicado
-    // Prioridade 2: "Nome Empresa - Nome Carteira"
-    // Prioridade 3: "Nome Empresa"
-    // Prioridade 4: Fallback do slug
-    // Prioridade 5: "Atendimento Digital"
-    let finalName;
+    // REGRA ABSOLUTA DO NOME:
+    // Deve vir estritamente de botConfig.identity.chatName quando existir.
+    // NUNCA usar fallback de slug, formatCompanyName, nome_empresa, nome da carteira ou "ML Gomes".
     if (
       botConfig?.identity?.chatName &&
       typeof botConfig.identity.chatName === "string" &&
       botConfig.identity.chatName.trim() !== ""
     ) {
-      finalName = botConfig.identity.chatName.trim();
-    } else if (resolvedContext.nome_empresa && resolvedContext.carteira_nome) {
-      finalName = `${resolvedContext.nome_empresa} - ${resolvedContext.carteira_nome}`;
-    } else if (resolvedContext.nome_empresa) {
-      finalName = resolvedContext.nome_empresa;
-    } else if (resolvedContext.fallbackNome) {
-      finalName = resolvedContext.fallbackNome;
+      if (headerTitle) {
+        headerTitle.textContent = botConfig.identity.chatName.trim();
+      }
+    } else if (!botConfig) {
+      if (headerTitle) {
+        headerTitle.textContent = "Atendimento Indisponível";
+      }
     } else {
-      finalName = "Atendimento Digital";
+      if (headerTitle) {
+        headerTitle.textContent = "Atendimento";
+      }
     }
 
-    if (headerTitle) {
-      headerTitle.textContent = finalName;
-    }
-
-    // Resolução da imagem / logo:
-    // Prioridade 1: profilePicUrl do Builder
-    // Prioridade 2: logo_url da tabela tenants
-    const finalLogo = botConfig?.identity?.profilePicUrl || resolvedContext.logo_url || null;
+    // REGRA DA LOGO:
+    // 1. botConfig.identity.profilePicUrl quando existir
+    // 2. companyLogoUrl (apenas se botConfig existir sem profilePicUrl)
+    const finalLogo = botConfig?.identity?.profilePicUrl || (botConfig ? companyLogoUrl : null);
     if (finalLogo && profilePic) {
       profilePic.src = finalLogo;
       profilePic.className = "profile-pic w-10 h-10 rounded-full object-cover border border-white/20 bg-white";
@@ -312,7 +294,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Obter configuração do bot e renderizar identidade UMA ÚNICA VEZ
   const botConfig = await getBotConfig({ tenantId, carteiraId, carteiraSlug });
-  renderChatIdentity(botConfig, resolved);
+  renderChatIdentity(botConfig, logoUrl);
 
   const chatArea = document.getElementById("chatArea");
   const userInput = document.getElementById("userInput");
@@ -1097,20 +1079,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Fluxo Inicial
   async function initChat() {
     const isWhatsappOrigin = origem === "whatsapp";
-
-    // Se carteiraId não foi resolvido anteriormente, tenta lookup resiliente
-    if (carteiraSlug && tenantId && !carteiraId && window.supabaseClient) {
-      const { data: cData, error: cError } = await window.supabaseClient
-        .from('carteiras')
-        .select('id, nome')
-        .eq('tenant_id', tenantId)
-        .ilike('slug', carteiraSlug.toLowerCase())
-        .single();
-
-      if (!cError && cData) {
-        carteiraId = cData.id;
-      }
-    }
 
     // Garantir que o campo de digitação esteja visível e ativo
     const footer = document.querySelector(".footer");
